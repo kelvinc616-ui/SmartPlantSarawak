@@ -1,4 +1,3 @@
-// screens/RegisterScreen.js
 import React, { useState } from "react";
 import {
   View,
@@ -34,7 +33,7 @@ export default function RegisterScreen({ navigation }) {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // 🗂️ Save extra data to Firestore (username, email, role)
+      //  Save extra data to Firestore (username, email, role)
       await setDoc(doc(db, "users", user.uid), {
         username: username.trim(),
         email: email.trim(),

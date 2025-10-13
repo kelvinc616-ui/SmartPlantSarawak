@@ -1,4 +1,3 @@
-// utils/mockData.js
 import plant1 from "../assets/images/plant1.jpg";
 import plant2 from "../assets/images/plant2.jpg";
 
@@ -8,7 +7,7 @@ export const mockObservations = [
     species: "Nepenthes rafflesiana",
     confidence: 0.91,
     location: "Kubah National Park",
-    image: plant1, // ✅ no URI
+    image: plant1, 
     status: "Verified",
   },
   {

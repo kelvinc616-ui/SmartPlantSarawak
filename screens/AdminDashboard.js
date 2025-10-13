@@ -1,4 +1,3 @@
-// screens/AdminDashboard.js
 import React from "react";
 import { View, Text, ScrollView, Button, StyleSheet } from "react-native";
 import { mockObservations } from "../utils/mockData";

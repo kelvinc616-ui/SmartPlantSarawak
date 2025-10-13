@@ -1,4 +1,3 @@
-// App.js
 import React, { useEffect } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
@@ -21,7 +20,7 @@ import AdminDashboard from "./screens/AdminDashboard";
 import IoTMonitoringScreen from "./screens/IoTMonitoringScreen";
 import ObservationDetails from "./screens/ObservationDetails";
 
-// 🔹 Tab Navigator
+// Tab Navigator
 const Tab = createBottomTabNavigator();
 
 // Main Tab Navigation (Home, Identify, Map, Profile)
@@ -50,11 +49,11 @@ function TabNavigator() {
   );
 }
 
-// 🔹 Stack Navigator
+// Stack Navigator
 const Stack = createNativeStackNavigator();
 
 export default function App() {
-  // 🧠 Test Firestore Connection on Startup (Optional)
+  // Test Firestore Connection on Startup (Optional)
   useEffect(() => {
     async function testFirebase() {
       try {
@@ -70,7 +69,7 @@ export default function App() {
   return (
     <NavigationContainer>
       <Stack.Navigator initialRouteName="Login">
-        {/* 🔐 Auth Screens */}
+        {/* Auth Screens */}
         <Stack.Screen
           name="Login"
           component={LoginScreen}
@@ -82,14 +81,14 @@ export default function App() {
           options={{ title: "Register" }}
         />
 
-        {/* 🌿 Main App */}
+        {/* Main App */}
         <Stack.Screen
           name="Main"
           component={TabNavigator}
           options={{ headerShown: false }}
         />
 
-        {/* 🔎 Additional Screens */}
+        {/* Additional Screens */}
         <Stack.Screen
           name="ObservationDetails"
           component={ObservationDetails}

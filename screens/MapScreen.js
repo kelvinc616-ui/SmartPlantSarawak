@@ -1,4 +1,3 @@
-// screens/MapScreen.js
 import React, { useState, useRef, useEffect } from "react";
 import {
   View,
@@ -35,7 +34,7 @@ export default function MapScreen({ navigation }) {
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
 
-  // 🧭 Get user's location on mount
+  // Get user's location on mount
   useEffect(() => {
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -54,7 +53,7 @@ export default function MapScreen({ navigation }) {
     })();
   }, []);
 
-  // 🔎 Search by address/place name using device geocoder (no API key)
+  // Search by address/place name using device geocoder (no API key)
   const handleSearch = async () => {
     const trimmed = query.trim();
     if (!trimmed) {
@@ -84,7 +83,7 @@ export default function MapScreen({ navigation }) {
     }
   };
 
-  // 📍 Add mock marker on long press
+  // Add mock marker on long press
   const handleAddMarker = (event) => {
     const newCoordinate = event.nativeEvent.coordinate;
     const newMarker = {
@@ -97,7 +96,7 @@ export default function MapScreen({ navigation }) {
     Alert.alert("📍 New Sighting", "Added new plant location successfully!");
   };
 
-  // 🎯 Center to user's current location
+  // Center to user's current location
   const handleCenterToUser = () => {
     if (!userLocation) {
       Alert.alert("Location not available", "Try again once GPS is ready.");
