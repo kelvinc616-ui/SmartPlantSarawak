@@ -6,14 +6,19 @@ import {
   TouchableOpacity,
   ImageBackground,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
+import { auth, db } from "../firebaseConfig";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 
 export default function IdentifyScreen({ navigation }) {
   const [selectedImage, setSelectedImage] = useState(null);
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  // 📸 Capture from camera
+  // Capture from camera
   const handleTakePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
@@ -29,10 +34,11 @@ export default function IdentifyScreen({ navigation }) {
 
     if (!result.canceled) {
       setSelectedImage(result.assets[0].uri);
+      setResult(null);
     }
   };
 
-  // 🖼️ Upload from gallery
+  // Upload from gallery
   const handleUploadImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
@@ -48,18 +54,54 @@ export default function IdentifyScreen({ navigation }) {
 
     if (!result.canceled) {
       setSelectedImage(result.assets[0].uri);
+      setResult(null);
     }
   };
 
-  // 🌿 Identify button press (mock for now)
-  const handleIdentify = () => {
+  // Identify Button — send to Flask & save result
+  const handleIdentify = async () => {
     if (!selectedImage) {
       Alert.alert("No Image Selected", "Please upload or capture a photo first.");
       return;
     }
 
-    Alert.alert("Analyzing Plant...", "Your image is being identified 🌿");
-    // later: navigation.navigate("ObservationDetails", { imageUri: selectedImage });
+    setLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", {
+        uri: selectedImage,
+        name: "photo.jpg",
+        type: "image/jpeg",
+      });
+
+      const response = await fetch("http://192.168.0.16:8080/predict", {
+        method: "POST",
+        body: formData,
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      const data = await response.json();
+      console.log("Prediction Result:", data);
+      setResult(data);
+
+      // Save to Firestore
+      await addDoc(collection(db, "predictions"), {
+        user: auth.currentUser?.email || "guest",
+        label: data.predicted_label,
+        confidence: data.confidence,
+        timestamp: serverTimestamp(),
+      });
+
+      Alert.alert(
+        "Identification Complete",
+        `Predicted: ${data.predicted_label}\nConfidence: ${data.confidence.toFixed(2)}%`
+      );
+    } catch (error) {
+      console.error("Prediction failed:", error);
+      Alert.alert("Error", "Could not identify the plant. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -77,7 +119,7 @@ export default function IdentifyScreen({ navigation }) {
         Capture or upload a photo of the plant to identify it
       </Text>
 
-      {/* 📷 Image Preview / Placeholder */}
+      {/* Image Preview / Placeholder */}
       <TouchableOpacity
         style={styles.imageContainer}
         activeOpacity={0.8}
@@ -97,7 +139,7 @@ export default function IdentifyScreen({ navigation }) {
         )}
       </TouchableOpacity>
 
-      {/* 📸 Action Buttons */}
+      {/* Action Buttons */}
       <View style={styles.buttonsContainer}>
         <TouchableOpacity
           style={[styles.button, styles.primaryButton]}
@@ -116,23 +158,37 @@ export default function IdentifyScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      {/* 🌿 Identify Button */}
+      {/* Identify Button */}
       <TouchableOpacity
         style={[
           styles.identifyButton,
-          !selectedImage && { backgroundColor: "#9ecfa2" }, // disable effect
+          (!selectedImage || loading) && { backgroundColor: "#9ecfa2" },
         ]}
         onPress={handleIdentify}
-        disabled={!selectedImage}
+        disabled={!selectedImage || loading}
       >
-        <Ionicons name="leaf" size={20} color="#fff" />
-        <Text style={styles.identifyButtonText}>Identify Plant</Text>
+        {loading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <>
+            <Ionicons name="leaf" size={20} color="#fff" />
+            <Text style={styles.identifyButtonText}>Identify Plant</Text>
+          </>
+        )}
       </TouchableOpacity>
+
+      {/* Result Box */}
+      {result && (
+        <View style={styles.resultBox}>
+          <Text style={styles.resultText}>🌿 Species: {result.predicted_label}</Text>
+          <Text style={styles.resultText}>📊 Confidence: {result.confidence}%</Text>
+        </View>
+      )}
     </View>
   );
 }
 
-// 💅 Styles
+// Styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -169,14 +225,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  preview: {
-    width: "100%",
-    height: "100%",
-  },
-  placeholderContainer: {
-    justifyContent: "center",
-    alignItems: "center",
-  },
+  preview: { width: "100%", height: "100%" },
+  placeholderContainer: { justifyContent: "center", alignItems: "center" },
   placeholderText: {
     color: "#5c6c5e",
     fontSize: 14,
@@ -195,22 +245,10 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 30,
   },
-  primaryButton: {
-    backgroundColor: "#15931b",
-  },
-  primaryButtonText: {
-    color: "#fff",
-    fontWeight: "700",
-    marginLeft: 8,
-  },
-  secondaryButton: {
-    backgroundColor: "rgba(21,147,27,0.1)",
-  },
-  secondaryButtonText: {
-    color: "#15931b",
-    fontWeight: "700",
-    marginLeft: 8,
-  },
+  primaryButton: { backgroundColor: "#15931b" },
+  primaryButtonText: { color: "#fff", fontWeight: "700", marginLeft: 8 },
+  secondaryButton: { backgroundColor: "rgba(21,147,27,0.1)" },
+  secondaryButtonText: { color: "#15931b", fontWeight: "700", marginLeft: 8 },
   identifyButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -220,10 +258,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#15931b",
     marginTop: 10,
   },
-  identifyButtonText: {
-    color: "#fff",
-    fontWeight: "700",
-    marginLeft: 8,
-    fontSize: 16,
+  identifyButtonText: { color: "#fff", fontWeight: "700", marginLeft: 8, fontSize: 16 },
+  resultBox: {
+    marginTop: 25,
+    backgroundColor: "#E8F5E9",
+    borderRadius: 12,
+    padding: 16,
   },
+  resultText: { fontSize: 16, fontWeight: "600", color: "#112112", marginBottom: 6 },
 });

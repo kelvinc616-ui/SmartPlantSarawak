@@ -66,70 +66,75 @@ def index():
 # ---------------------------
 # Predict Endpoint
 # ---------------------------
-# @app.route("/predict", methods=["POST"])
-# def predict():
-#     if "file" not in request.files:
-#         return jsonify({"error": "No file part in request"}), 400
-
-#     file = request.files["file"]
-#     if file.filename == "":
-#         return jsonify({"error": "No file selected"}), 400
-
-#     try:
-#         # Load and preprocess the image
-#         img = Image.open(io.BytesIO(file.read())).convert("RGB")
-#         img = img.resize((224, 224))  # Adjust if your model uses a different size
-#         img_array = np.array(img) / 255.0
-#         img_array = np.expand_dims(img_array, axis=0)
-
-#         # Predict
-#         preds = model.predict(img_array)
-#         pred_index = int(np.argmax(preds))
-#         confidence = float(np.max(preds))
-
-#         result = {
-#             "predicted_label": labels[pred_index] if pred_index < len(labels) else "Unknown",
-#             "confidence": round(confidence * 100, 2),
-#             "model_version": MODEL_VERSION
-#         }
-
-#         print(f" Prediction: {result['predicted_label']} ({result['confidence']}%)")
-#         return jsonify(result)
-
-#     except Exception as e:
-#         print(" Prediction Error:", str(e))
-#         return jsonify({"error": str(e)}), 500
-
 @app.route("/predict", methods=["POST"])
 def predict():
     if "file" not in request.files:
-        return jsonify({"error": "no file"}), 400
+        return jsonify({"error": "No file part in request"}), 400
+
     file = request.files["file"]
     if file.filename == "":
-        return jsonify({"error": "empty file"}), 400
+        return jsonify({"error": "No file selected"}), 400
 
-    # Load & preprocess image
-    img = Image.open(file.stream).convert("RGB")
-    img = img.resize((224, 224))
-    x = np.expand_dims(np.array(img) / 255.0, axis=0)
+    try:
+        # Load and preprocess the image
+        img = Image.open(io.BytesIO(file.read())).convert("RGB")
+        img = img.resize((224, 224))  # Adjust if your model uses a different size
+        img_array = np.array(img) / 255.0
+        img_array = np.expand_dims(img_array, axis=0)
 
-    preds = model.predict(x)
-    i = int(np.argmax(preds[0]))
-    conf = float(preds[0][i]) * 100
-    label = labels[i] if i < len(labels) else "Unknown"
+        labels = json.load(open("labels.json"))
+        print(len(labels))
+        
+        # Predict
+        preds = model.predict(img_array)
+        print("Raw probabilities:", preds[0])
+        print("Argmax index:", np.argmax(preds[0]))
+        pred_index = int(np.argmax(preds))
+        confidence = float(np.max(preds))
 
-    # low-confidence threshold
-    if conf < 60:
-        label = "Unknown"
+        result = {
+            "predicted_label": labels[pred_index] if pred_index < len(labels) else "Unknown",
+            "confidence": round(confidence * 100, 2),
+            "model_version": MODEL_VERSION
+        }
 
-    result = {
-        "predicted_label": label,
-        "confidence": round(conf, 2),
-        "model_version": "v1",
-        "timestamp": datetime.utcnow().isoformat()
-    }
-    print("✅ Prediction:", result)
-    return jsonify(result)
+        print(f" Prediction: {result['predicted_label']} ({result['confidence']}%)")
+        return jsonify(result)
+
+    except Exception as e:
+        print(" Prediction Error:", str(e))
+        return jsonify({"error": str(e)}), 500
+
+# @app.route("/predict", methods=["POST"])
+# def predict():
+#     if "file" not in request.files:
+#         return jsonify({"error": "no file"}), 400
+#     file = request.files["file"]
+#     if file.filename == "":
+#         return jsonify({"error": "empty file"}), 400
+
+#     # Load & preprocess image
+#     img = Image.open(file.stream).convert("RGB")
+#     img = img.resize((224, 224))
+#     x = np.expand_dims(np.array(img) / 255.0, axis=0)
+
+#     preds = model.predict(x)
+#     i = int(np.argmax(preds[0]))
+#     conf = float(preds[0][i]) * 100
+#     label = labels[i] if i < len(labels) else "Unknown"
+
+#     # low-confidence threshold
+#     if conf < 60:
+#         label = "Unknown"
+
+#     result = {
+#         "predicted_label": label,
+#         "confidence": round(conf, 2),
+#         "model_version": "v1",
+#         "timestamp": datetime.utcnow().isoformat()
+#     }
+#     print("✅ Prediction:", result)
+#     return jsonify(result)
 
 # ---------------------------
 # Run the App
