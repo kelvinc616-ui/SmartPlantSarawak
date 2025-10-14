@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import tensorflow as tf
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageOps
 from datetime import datetime
 import io
 import json
@@ -61,7 +61,30 @@ def version():
 # ---------------------------
 @app.route("/")
 def index():
-    return "<h3> SmartPlantSarawak AI Backend</h3><p>Use /predict to send an image and get a prediction.</p>"
+    return "<h3> SmartPlantSarawak AI Backend</h3><p>Use <b>/predict</b> to send an image and get a prediction.</p>"
+
+# ---------------------------
+# Image Preprocessing Function
+# ---------------------------
+def preprocess_image(file):
+    # Read image bytes from request
+    image_bytes = file.read()
+    img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+
+    # Fix mobile rotation issues (EXIF)
+    img = ImageOps.exif_transpose(img)
+
+    # Resize to match training input
+    img = img.resize((224, 224))
+
+    # Convert to numpy array and preprocess
+    img_array = np.expand_dims(np.array(img), axis=0).astype(np.float32)
+    img_array = tf.keras.applications.mobilenet_v3.preprocess_input(img_array)
+
+    print(f"🖼️ Image processed: shape={img_array.shape}, dtype={img_array.dtype}, "
+          f"range=({np.min(img_array):.2f}, {np.max(img_array):.2f})")
+
+    return img_array
 
 # ---------------------------
 # Predict Endpoint
@@ -69,72 +92,53 @@ def index():
 @app.route("/predict", methods=["POST"])
 def predict():
     if "file" not in request.files:
-        return jsonify({"error": "No file part in request"}), 400
+        return jsonify({"error": "No file found in request"}), 400
 
     file = request.files["file"]
     if file.filename == "":
-        return jsonify({"error": "No file selected"}), 400
+        return jsonify({"error": "Empty file name"}), 400
 
     try:
-        # Load and preprocess the image
-        img = Image.open(io.BytesIO(file.read())).convert("RGB")
-        img = img.resize((224, 224))  # Adjust if your model uses a different size
-        img_array = np.array(img) / 255.0
-        img_array = np.expand_dims(img_array, axis=0)
+        # Preprocess the image
+        img_array = preprocess_image(file)
 
-        labels = json.load(open("labels.json"))
-        print(len(labels))
-        
-        # Predict
-        preds = model.predict(img_array)
-        print("Raw probabilities:", preds[0])
-        print("Argmax index:", np.argmax(preds[0]))
-        pred_index = int(np.argmax(preds))
-        confidence = float(np.max(preds))
+        # Perform prediction
+        preds = model.predict(img_array)[0]  # shape: (num_classes,)
+
+        # Sort predictions by confidence
+        top_indices = np.argsort(preds)[::-1][:3]  # Top 3 descending order
+        top_labels = [labels[i] for i in top_indices]
+        top_confidences = [float(preds[i]) * 100 for i in top_indices]
+
+        # Build full response
+        top_predictions = [
+            {"label": lbl, "confidence": round(conf, 2)}
+            for lbl, conf in zip(top_labels, top_confidences)
+        ]
+
+        # Best (Top-1) result
+        best_label = top_labels[0]
+        best_confidence = round(top_confidences[0], 2)
 
         result = {
-            "predicted_label": labels[pred_index] if pred_index < len(labels) else "Unknown",
-            "confidence": round(confidence * 100, 2),
-            "model_version": MODEL_VERSION
+            "predicted_label": best_label if best_confidence >= 50 else "Unknown",
+            "confidence": best_confidence,
+            "top_predictions": top_predictions,
+            "model_version": MODEL_VERSION,
+            "timestamp": datetime.utcnow().isoformat()
         }
 
-        print(f" Prediction: {result['predicted_label']} ({result['confidence']}%)")
+        print("\nTop-3 Predictions:")
+        for rank, (lbl, conf) in enumerate(zip(top_labels, top_confidences), 1):
+            print(f"  {rank}. {lbl} ({conf:.2f}%)")
+        print(f"Final Prediction: {result['predicted_label']} ({result['confidence']}%)\n")
+
         return jsonify(result)
 
     except Exception as e:
-        print(" Prediction Error:", str(e))
+        print("Prediction Error:", str(e))
         return jsonify({"error": str(e)}), 500
 
-# @app.route("/predict", methods=["POST"])
-# def predict():
-#     if "file" not in request.files:
-#         return jsonify({"error": "no file"}), 400
-#     file = request.files["file"]
-#     if file.filename == "":
-#         return jsonify({"error": "empty file"}), 400
-
-#     # Load & preprocess image
-#     img = Image.open(file.stream).convert("RGB")
-#     img = img.resize((224, 224))
-#     x = np.expand_dims(np.array(img) / 255.0, axis=0)
-
-#     preds = model.predict(x)
-#     i = int(np.argmax(preds[0]))
-#     conf = float(preds[0][i]) * 100
-#     label = labels[i] if i < len(labels) else "Unknown"
-
-#     # low-confidence threshold
-#     if conf < 60:
-#         label = "Unknown"
-
-#     result = {
-#         "predicted_label": label,
-#         "confidence": round(conf, 2),
-#         "model_version": "v1",
-#         "timestamp": datetime.utcnow().isoformat()
-#     }
-#     print("✅ Prediction:", result)
-#     return jsonify(result)
 
 # ---------------------------
 # Run the App
