@@ -58,9 +58,9 @@ export default function App() {
     async function testFirebase() {
       try {
         const snapshot = await getDocs(collection(db, "users"));
-        console.log(`✅ Connected to Firestore! Found ${snapshot.size} user(s).`);
+        console.log(`Connected to Firestore! Found ${snapshot.size} user(s).`);
       } catch (error) {
-        console.error("❌ Firestore connection failed:", error);
+        console.error("Firestore connection failed:", error);
       }
     }
     testFirebase();

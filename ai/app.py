@@ -91,16 +91,30 @@ def preprocess_image(file):
 # ---------------------------
 @app.route("/predict", methods=["POST"])
 def predict():
-    if "file" not in request.files:
-        return jsonify({"error": "No file found in request"}), 400
-
-    file = request.files["file"]
-    if file.filename == "":
-        return jsonify({"error": "Empty file name"}), 400
-
     try:
+        img = None
+
+        # Case 1️⃣: File directly uploaded via multipart/form-data
+        if "file" in request.files:
+            file = request.files["file"]
+            if file.filename == "":
+                return jsonify({"error": "Empty file name"}), 400
+            img = file
+
+        # Case 2️⃣: JSON payload with Firebase Storage URL
+        elif request.is_json and "image_url" in request.json:
+            image_url = request.json["image_url"]
+            import requests, io
+            response = requests.get(image_url)
+            if response.status_code != 200:
+                return jsonify({"error": f"Failed to fetch image from URL ({response.status_code})"}), 400
+            img = io.BytesIO(response.content)
+
+        else:
+            return jsonify({"error": "No image provided (file or image_url required)"}), 400
+
         # Preprocess the image
-        img_array = preprocess_image(file)
+        img_array = preprocess_image(img)
 
         # Perform prediction
         preds = model.predict(img_array)[0]  # shape: (num_classes,)
@@ -140,9 +154,11 @@ def predict():
         return jsonify({"error": str(e)}), 500
 
 
+
 # ---------------------------
 # Run the App
 # ---------------------------
 if __name__ == "__main__":
+    import os
     port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port, debug=True)
+    app.run(host="0.0.0.0", port=port, debug=False)

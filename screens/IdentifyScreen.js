@@ -7,188 +7,276 @@ import {
   ImageBackground,
   Alert,
   ActivityIndicator,
+  ScrollView,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+// import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
+import { FileSystemUploadType } from "expo-file-system"; 
 import { Ionicons } from "@expo/vector-icons";
-import { auth, db } from "../firebaseConfig";
+import { auth, db, storage } from "../firebaseConfig";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 export default function IdentifyScreen({ navigation }) {
   const [selectedImage, setSelectedImage] = useState(null);
-  const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
 
   // Capture from camera
   const handleTakePhoto = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert("Permission Denied", "Camera access is required.");
-      return;
-    }
+    try {
+      console.log("Opening camera...");
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission Denied", "Camera access is required.");
+        return;
+      }
 
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 1,
-    });
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: "images",
+        allowsEditing: true,
+        quality: 1,
+      });
 
-    if (!result.canceled) {
-      setSelectedImage(result.assets[0].uri);
-      setResult(null);
+      console.log("Camera result:", result);
+      if (!result.canceled) {
+        setSelectedImage(result.assets[0].uri);
+        setResult(null);
+      }
+    } catch (err) {
+      console.error("Camera error:", err);
+      Alert.alert("Error", "Failed to open camera.");
     }
   };
 
   // Upload from gallery
   const handleUploadImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert("Permission Denied", "Gallery access is required.");
-      return;
-    }
+    try {
+      console.log("Opening gallery...");
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission Denied", "Gallery access is required.");
+        return;
+      }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 1,
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: "images",
+        allowsEditing: true,
+        quality: 1,
+      });
+
+      console.log("Gallery result:", result);
+      if (!result.canceled) {
+        setSelectedImage(result.assets[0].uri);
+        setResult(null);
+      }
+    } catch (err) {
+      console.error("Gallery error:", err);
+      Alert.alert("Error", "Failed to open gallery.");
+    }
+  };
+
+  // Identify Button — Upload → Predict → Save to Firestore
+  const handleIdentify = async () => {
+  if (!selectedImage) {
+    Alert.alert("No Image Selected", "Please upload or capture a photo first.");
+    return;
+  }
+
+  setLoading(true);
+  try {
+    // 🔹 1. Get current user
+    const user = auth.currentUser;
+    const fileName = `${user?.uid || "guest"}_${Date.now()}.jpg`;
+    const BUCKET_NAME = "smartplantsarawak-f13b9.firebasestorage.app";
+    const uploadUrl = `https://firebasestorage.googleapis.com/v0/b/${BUCKET_NAME}/o/predictions%2F${encodeURIComponent(
+      fileName
+    )}?uploadType=media`;
+
+
+    console.log("Uploading image via fetch:", uploadUrl);
+
+    // 🔹 2. Upload image directly using fetch()
+    const img = await fetch(selectedImage);
+    const blob = await img.blob();
+
+    const uploadResponse = await fetch(uploadUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "image/jpeg",
+      },
+      body: blob,
     });
 
-    if (!result.canceled) {
-      setSelectedImage(result.assets[0].uri);
-      setResult(null);
-    }
-  };
-
-  // Identify Button — send to Flask & save result
-  const handleIdentify = async () => {
-    if (!selectedImage) {
-      Alert.alert("No Image Selected", "Please upload or capture a photo first.");
-      return;
+    if (!uploadResponse.ok) {
+      throw new Error(`Upload failed with status ${uploadResponse.status}`);
     }
 
-    setLoading(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", {
-        uri: selectedImage,
-        name: "photo.jpg",
-        type: "image/jpeg",
-      });
+    // 🔹 3. Build a public download URL
+    const imageURL = `https://firebasestorage.googleapis.com/v0/b/${BUCKET_NAME}/o/predictions%2F${encodeURIComponent(
+      fileName
+    )}?alt=media`;
+    console.log("✅ Uploaded image:", imageURL);
 
-      const response = await fetch("http://192.168.0.16:8080/predict", {
+    // 🔹 4. Send URL to your Flask AI API
+    const aiResponse = await fetch(
+      "https://smartplant-ai-615502932033.asia-southeast1.run.app/predict",
+      {
         method: "POST",
-        body: formData,
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ image_url: imageURL }),
+      }
+    );
 
-      const data = await response.json();
-      console.log("Prediction Result:", data);
-      setResult(data);
-
-      // Save to Firestore
-      await addDoc(collection(db, "predictions"), {
-        user: auth.currentUser?.email || "guest",
-        label: data.predicted_label,
-        confidence: data.confidence,
-        timestamp: serverTimestamp(),
-      });
-
-      Alert.alert(
-        "Identification Complete",
-        `Predicted: ${data.predicted_label}\nConfidence: ${data.confidence.toFixed(2)}%`
-      );
-    } catch (error) {
-      console.error("Prediction failed:", error);
-      Alert.alert("Error", "Could not identify the plant. Please try again.");
-    } finally {
-      setLoading(false);
+    if (!aiResponse.ok) {
+      throw new Error(`Prediction failed: HTTP ${aiResponse.status}`);
     }
+
+    const prediction = await aiResponse.json();
+    console.log("Prediction received:", prediction);
+
+    // 🔹 5. Save to Firestore
+    await addDoc(collection(db, "predictions"), {
+      userId: user?.uid || "guest",
+      imageUrl: imageURL,
+      predicted_label: prediction.predicted_label,
+      confidence: prediction.confidence,
+      top_predictions: prediction.top_predictions || [],
+      model_version: prediction.model_version,
+      timestamp: serverTimestamp(),
+    });
+
+    // 🔹 6. Show result
+    Alert.alert(
+      "Prediction Result",
+      `${prediction.predicted_label} (${prediction.confidence}%)`
+    );
+    setResult(prediction);
+  } catch (error) {
+    console.error("Error:", error);
+    Alert.alert("Error", "Failed to upload or identify. Please try again.");
+  } finally {
+    setLoading(false);
+  }
   };
+
+
+
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#112112" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Identify</Text>
-        <View style={{ width: 24 }} />
-      </View>
-
-      <Text style={styles.subtitle}>
-        Capture or upload a photo of the plant to identify it
-      </Text>
-
-      {/* Image Preview / Placeholder */}
-      <TouchableOpacity
-        style={styles.imageContainer}
-        activeOpacity={0.8}
-        onPress={handleUploadImage}
+      {/* ✅ Make the entire content scrollable */}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 40 }}
       >
-        {selectedImage ? (
-          <ImageBackground
-            source={{ uri: selectedImage }}
-            style={styles.preview}
-            imageStyle={{ borderRadius: 16 }}
-          />
-        ) : (
-          <View style={styles.placeholderContainer}>
-            <Ionicons name="cloud-upload-outline" size={60} color="#15931b" />
-            <Text style={styles.placeholderText}>Tap to upload or take a photo</Text>
-          </View>
-        )}
-      </TouchableOpacity>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+          >
+            <Ionicons name="arrow-back" size={24} color="#112112" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Identify</Text>
+          <View style={{ width: 24 }} />
+        </View>
 
-      {/* Action Buttons */}
-      <View style={styles.buttonsContainer}>
-        <TouchableOpacity
-          style={[styles.button, styles.primaryButton]}
-          onPress={handleTakePhoto}
-        >
-          <Ionicons name="camera" size={20} color="#fff" />
-          <Text style={styles.primaryButtonText}>Take a Photo</Text>
-        </TouchableOpacity>
+        <Text style={styles.subtitle}>
+          Capture or upload a photo of the plant to identify it
+        </Text>
 
+        {/* Image preview */}
         <TouchableOpacity
-          style={[styles.button, styles.secondaryButton]}
+          style={styles.imageContainer}
+          activeOpacity={0.8}
           onPress={handleUploadImage}
         >
-          <Ionicons name="image" size={20} color="#15931b" />
-          <Text style={styles.secondaryButtonText}>Upload from Gallery</Text>
+          {selectedImage ? (
+            <ImageBackground
+              source={{ uri: selectedImage }}
+              style={styles.preview}
+              imageStyle={{ borderRadius: 16 }}
+            />
+          ) : (
+            <View style={styles.placeholderContainer}>
+              <Ionicons name="cloud-upload-outline" size={60} color="#15931b" />
+              <Text style={styles.placeholderText}>
+                Tap to upload or take a photo
+              </Text>
+            </View>
+          )}
         </TouchableOpacity>
-      </View>
 
-      {/* Identify Button */}
-      <TouchableOpacity
-        style={[
-          styles.identifyButton,
-          (!selectedImage || loading) && { backgroundColor: "#9ecfa2" },
-        ]}
-        onPress={handleIdentify}
-        disabled={!selectedImage || loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <>
-            <Ionicons name="leaf" size={20} color="#fff" />
-            <Text style={styles.identifyButtonText}>Identify Plant</Text>
-          </>
-        )}
-      </TouchableOpacity>
+        {/* Buttons */}
+        <View style={styles.buttonsContainer}>
+          <TouchableOpacity
+            style={[styles.button, styles.primaryButton]}
+            onPress={handleTakePhoto}
+          >
+            <Ionicons name="camera" size={20} color="#fff" />
+            <Text style={styles.primaryButtonText}>Take a Photo</Text>
+          </TouchableOpacity>
 
-      {/* Result Box */}
-      {result && (
-        <View style={styles.resultBox}>
-          <Text style={styles.resultText}>🌿 Species: {result.predicted_label}</Text>
-          <Text style={styles.resultText}>📊 Confidence: {result.confidence}%</Text>
+          <TouchableOpacity
+            style={[styles.button, styles.secondaryButton]}
+            onPress={handleUploadImage}
+          >
+            <Ionicons name="image" size={20} color="#15931b" />
+            <Text style={styles.secondaryButtonText}>
+              Upload from Gallery
+            </Text>
+          </TouchableOpacity>
         </View>
-      )}
+
+        {/* Identify Button */}
+        <TouchableOpacity
+          style={[
+            styles.identifyButton,
+            (!selectedImage || loading) && { backgroundColor: "#9ecfa2" },
+          ]}
+          onPress={handleIdentify}
+          disabled={!selectedImage || loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <>
+              <Ionicons name="leaf" size={20} color="#fff" />
+              <Text style={styles.identifyButtonText}>Identify Plant</Text>
+            </>
+          )}
+        </TouchableOpacity>
+
+        {/* Prediction Result */}
+        {result && (
+          <View style={styles.resultBox}>
+            <Text style={styles.resultText}>
+              🌿 Species: {result.predicted_label}
+            </Text>
+            <Text style={styles.resultText}>
+              📊 Confidence: {result.confidence}%
+            </Text>
+            {result.top_predictions?.length > 1 && (
+              <View>
+                <Text style={styles.resultText}>Top 3 Predictions:</Text>
+                {result.top_predictions.map((p, index) => (
+                  <Text key={index} style={styles.resultText}>
+                    {index + 1}. {p.label} ({p.confidence}%)
+                  </Text>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
+      </ScrollView>
     </View>
   );
 }
 
-// Styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -258,12 +346,22 @@ const styles = StyleSheet.create({
     backgroundColor: "#15931b",
     marginTop: 10,
   },
-  identifyButtonText: { color: "#fff", fontWeight: "700", marginLeft: 8, fontSize: 16 },
+  identifyButtonText: {
+    color: "#fff",
+    fontWeight: "700",
+    marginLeft: 8,
+    fontSize: 16,
+  },
   resultBox: {
     marginTop: 25,
     backgroundColor: "#E8F5E9",
     borderRadius: 12,
     padding: 16,
   },
-  resultText: { fontSize: 16, fontWeight: "600", color: "#112112", marginBottom: 6 },
+  resultText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#112112",
+    marginBottom: 6,
+  },
 });

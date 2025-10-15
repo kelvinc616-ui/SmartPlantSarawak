@@ -24,7 +24,7 @@ export default function ProfileScreen({ navigation }) {
           }
         }
       } catch (error) {
-        console.error("❌ Error fetching user data:", error);
+        console.error("Error fetching user data:", error);
         Alert.alert("Error", "Could not load profile data.");
       } finally {
         setLoading(false);
