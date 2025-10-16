@@ -16,6 +16,7 @@ import AdminDashboard from "./screens/AdminDashboard";
 import IoTMonitoringScreen from "./screens/IoTMonitoringScreen";
 import ObservationDetails from "./screens/ObservationDetails";
 import ManageUsers from "./screens/ManageUsers";
+import ManagePredictions from "./screens/ManagePredictions";
 
 // Tab Navigators
 import UserMain from "./navigation/UserMain";
@@ -58,9 +59,12 @@ export default function App() {
           component={AdminDashboard}
           options={{ title: "Admin Dashboard" }}
         />
-        
+
         {/*for managing users*/}
         <Stack.Screen name="ManageUsers" component={ManageUsers} /> 
+
+        {/*for managing user predictions*/}
+        <Stack.Screen name="ManagePredictions" component={ManagePredictions} />
 
         <Stack.Screen
           name="IoTMonitoring"
