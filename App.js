@@ -1,13 +1,9 @@
 import React, { useEffect } from "react";
 import { NavigationContainer } from "@react-navigation/native";
-import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
-import { View, Text } from "react-native";
-
-// Firebase Imports
-import { db } from "./firebaseConfig";
 import { collection, getDocs } from "firebase/firestore";
+import { db } from "./firebaseConfig";
 
 // Screens
 import HomeScreen from "./screens/HomeScreen";
@@ -20,47 +16,22 @@ import AdminDashboard from "./screens/AdminDashboard";
 import IoTMonitoringScreen from "./screens/IoTMonitoringScreen";
 import ObservationDetails from "./screens/ObservationDetails";
 
-// Tab Navigator
-const Tab = createBottomTabNavigator();
-
-// Main Tab Navigation (Home, Identify, Map, Profile)
-function TabNavigator() {
-  return (
-    <Tab.Navigator
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarIcon: ({ color, size }) => {
-          let iconName;
-          if (route.name === "Home") iconName = "home-outline";
-          else if (route.name === "Identify") iconName = "camera-outline";
-          else if (route.name === "Map") iconName = "map-outline";
-          else if (route.name === "Profile") iconName = "person-outline";
-          return <Ionicons name={iconName} size={size} color={color} />;
-        },
-        tabBarActiveTintColor: "#2E7D32",
-        tabBarInactiveTintColor: "gray",
-      })}
-    >
-      <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Identify" component={IdentifyScreen} />
-      <Tab.Screen name="Map" component={MapScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
-    </Tab.Navigator>
-  );
-}
+// Tab Navigators
+import UserMain from "./navigation/UserMain";
+import AdminMain from "./navigation/AdminMain";
 
 // Stack Navigator
 const Stack = createNativeStackNavigator();
 
 export default function App() {
-  // Test Firestore Connection on Startup (Optional)
+  // ✅ Optional: Test Firestore connection on startup
   useEffect(() => {
     async function testFirebase() {
       try {
         const snapshot = await getDocs(collection(db, "users"));
-        console.log(`Connected to Firestore! Found ${snapshot.size} user(s).`);
+        console.log(`✅ Connected to Firestore! Found ${snapshot.size} user(s).`);
       } catch (error) {
-        console.error("Firestore connection failed:", error);
+        console.error("❌ Firestore connection failed:", error);
       }
     }
     testFirebase();
@@ -68,32 +39,19 @@ export default function App() {
 
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="Login">
-        {/* Auth Screens */}
-        <Stack.Screen
-          name="Login"
-          component={LoginScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="Register"
-          component={RegisterScreen}
-          options={{ title: "Register" }}
-        />
+      <Stack.Navigator
+        initialRouteName="Login"
+        screenOptions={{ headerShown: false }}
+      >
+        {/* 🔐 Authentication Screens */}
+        <Stack.Screen name="Login" component={LoginScreen} />
+        <Stack.Screen name="Register" component={RegisterScreen} />
 
-        {/* Main App */}
-        <Stack.Screen
-          name="Main"
-          component={TabNavigator}
-          options={{ headerShown: false }}
-        />
+        {/* 🌿 Main User + Admin Navigators */}
+        <Stack.Screen name="UserMain" component={UserMain} />
+        <Stack.Screen name="AdminMain" component={AdminMain} />
 
-        {/* Additional Screens */}
-        <Stack.Screen
-          name="ObservationDetails"
-          component={ObservationDetails}
-          options={{ title: "Observation Details" }}
-        />
+        {/* ⚙️ Additional Admin & Utility Screens */}
         <Stack.Screen
           name="AdminDashboard"
           component={AdminDashboard}
@@ -103,6 +61,11 @@ export default function App() {
           name="IoTMonitoring"
           component={IoTMonitoringScreen}
           options={{ title: "IoT Monitoring" }}
+        />
+        <Stack.Screen
+          name="ObservationDetails"
+          component={ObservationDetails}
+          options={{ title: "Observation Details" }}
         />
       </Stack.Navigator>
     </NavigationContainer>

@@ -1,45 +1,77 @@
+// screens/AdminDashboard.js
 import React from "react";
-import { View, Text, ScrollView, Button, StyleSheet } from "react-native";
-import { mockObservations } from "../utils/mockData";
-import ObservationCard from "../components/ObservationCard";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function AdminDashboard({ navigation }) {
-  const flagged = mockObservations.filter((o) => o.status === "Flagged");
-
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Admin Dashboard</Text>
-      <Text style={styles.subtitle}>Flagged Observations ({flagged.length})</Text>
+    <ScrollView style={styles.container}>
+      <Text style={styles.title}>🌿 SmartPlant Admin Panel</Text>
+      <Text style={styles.subtitle}>Manage users, monitor predictions, and view analytics.</Text>
 
-      {flagged.map((obs) => (
-        <ObservationCard key={obs.id} {...obs} />
-      ))}
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => navigation.navigate("ManagePredictions")}
+      >
+        <Ionicons name="analytics-outline" size={26} color="#2E7D32" />
+        <View style={{ marginLeft: 10 }}>
+          <Text style={styles.cardTitle}>Manage Predictions</Text>
+          <Text style={styles.cardDesc}>View or delete user predictions.</Text>
+        </View>
+      </TouchableOpacity>
 
-      <View style={{ marginVertical: 20 }}>
-        <Button
-          title="View IoT Monitoring"
-          color="#1565C0"
-          onPress={() => navigation.navigate("IoTMonitoring")}
-        />
-      </View>
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => navigation.navigate("ManageUsers")}
+      >
+        <Ionicons name="people-outline" size={26} color="#2E7D32" />
+        <View style={{ marginLeft: 10 }}>
+          <Text style={styles.cardTitle}>Manage Users</Text>
+          <Text style={styles.cardDesc}>View, promote, or remove users.</Text>
+        </View>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => navigation.navigate("Analytics")}
+      >
+        <Ionicons name="stats-chart-outline" size={26} color="#2E7D32" />
+        <View style={{ marginLeft: 10 }}>
+          <Text style={styles.cardTitle}>View Analytics</Text>
+          <Text style={styles.cardDesc}>Check prediction usage and performance metrics.</Text>
+        </View>
+      </TouchableOpacity>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 16,
-    backgroundColor: "#F7F8FA",
-  },
+  container: { flex: 1, backgroundColor: "#f7f8f7", padding: 20 },
   title: {
     fontSize: 24,
-    fontWeight: "bold",
+    fontWeight: "700",
     color: "#2E7D32",
-    marginBottom: 10,
+    textAlign: "center",
+    marginTop: 40,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 14,
+    textAlign: "center",
     color: "#555",
-    marginBottom: 10,
+    marginBottom: 20,
   },
+  card: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 16,
+    marginVertical: 8,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  cardTitle: { fontSize: 16, fontWeight: "600", color: "#1a1a1a" },
+  cardDesc: { fontSize: 13, color: "#666" },
 });

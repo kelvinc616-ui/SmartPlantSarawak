@@ -1,5 +1,13 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet, Image } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Alert,
+  StyleSheet,
+  Image,
+} from "react-native";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "../firebaseConfig";
 import { doc, getDoc } from "firebase/firestore";
@@ -17,11 +25,11 @@ export default function LoginScreen({ navigation }) {
 
     setLoading(true);
     try {
-      // 1️⃣ Sign in user with Firebase Auth
+      // 🔹 1. Sign in user with Firebase Authentication
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // 2️⃣ Fetch Firestore profile document
+      // 🔹 2. Retrieve the user's Firestore profile
       const docRef = doc(db, "users", user.uid);
       const docSnap = await getDoc(docRef);
 
@@ -29,11 +37,13 @@ export default function LoginScreen({ navigation }) {
         const userData = docSnap.data();
         console.log("✅ Logged in as:", userData);
 
-        // 3️⃣ Role-based navigation
+        // 🔹 3. Role-based navigation logic
         if (userData.role === "admin") {
-          navigation.replace("AdminDashboard");
+          navigation.replace("AdminMain"); // Admin route
+        } else if (userData.role === "public") {
+          navigation.replace("UserMain"); // Normal user route
         } else {
-          navigation.replace("Main");
+          Alert.alert("Error", "Unknown role assigned to this account.");
         }
       } else {
         Alert.alert("Error", "User profile not found in Firestore.");
@@ -55,6 +65,7 @@ export default function LoginScreen({ navigation }) {
           }}
           style={styles.headerImage}
         />
+
         <Text style={styles.title}>Welcome Back</Text>
         <Text style={styles.subtitle}>
           Log in to continue your journey in protecting Sarawak’s biodiversity.
@@ -78,13 +89,22 @@ export default function LoginScreen({ navigation }) {
           secureTextEntry
         />
 
-        <TouchableOpacity onPress={handleLogin} style={styles.loginButton} disabled={loading}>
-          <Text style={styles.loginText}>{loading ? "Logging in..." : "Login"}</Text>
+        {/* Login Button */}
+        <TouchableOpacity
+          onPress={handleLogin}
+          style={styles.loginButton}
+          disabled={loading}
+        >
+          <Text style={styles.loginText}>
+            {loading ? "Logging in..." : "Login"}
+          </Text>
         </TouchableOpacity>
 
+        {/* Register Link */}
         <TouchableOpacity onPress={() => navigation.navigate("Register")}>
           <Text style={styles.signupText}>
-            Don’t have an account? <Text style={{ color: "#2E7D32", fontWeight: "700" }}>Sign up</Text>
+            Don’t have an account?{" "}
+            <Text style={{ color: "#2E7D32", fontWeight: "700" }}>Sign up</Text>
           </Text>
         </TouchableOpacity>
       </View>
