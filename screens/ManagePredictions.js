@@ -103,26 +103,32 @@ export default function ManagePredictions() {
     setNewLabel(item.predicted_label);
   };
 
-  const saveEdit = async () => {
-    if (!editingPrediction) return;
-    try {
-      const docRef = doc(db, "predictions", editingPrediction.id);
-      await updateDoc(docRef, { predicted_label: newLabel, verified: true });
-      const updated = predictions.map((p) =>
-        p.id === editingPrediction.id
-          ? { ...p, predicted_label: newLabel, verified: true }
-          : p
-      );
-      setPredictions(updated);
-      setFiltered(updated);
-      setEditingPrediction(null);
-      setNewLabel("");
-      Alert.alert("Updated", "Prediction label updated successfully.");
-    } catch (error) {
-      console.error("Error updating prediction:", error);
-      Alert.alert("Error", "Failed to update prediction.");
-    }
-  };
+const saveEdit = async () => {
+  if (!editingPrediction) return;
+  try {
+    const docRef = doc(db, "predictions", editingPrediction.id);
+    await updateDoc(docRef, {
+      predicted_label: newLabel,
+      verified: editingPrediction.verified || false,
+    });
+
+    const updated = predictions.map((p) =>
+      p.id === editingPrediction.id
+        ? { ...p, predicted_label: newLabel, verified: editingPrediction.verified }
+        : p
+    );
+
+    setPredictions(updated);
+    setFiltered(updated);
+    setEditingPrediction(null);
+    setNewLabel("");
+    Alert.alert("Updated", "Prediction updated successfully.");
+  } catch (error) {
+    console.error("Error updating prediction:", error);
+    Alert.alert("Error", "Failed to update prediction.");
+  }
+};
+
 
   useEffect(() => {
     fetchPredictions();
@@ -232,6 +238,24 @@ export default function ManagePredictions() {
               placeholder="Enter new label"
               placeholderTextColor="#999"
             />
+            {/* Verify Checkbox */}
+      <TouchableOpacity
+        style={styles.verifyRow}
+        onPress={() =>
+          setEditingPrediction((prev) => ({
+            ...prev,
+            verified: !prev.verified,
+          }))
+        }
+      >
+        <Ionicons
+          name={editingPrediction?.verified ? "checkbox-outline" : "square-outline"}
+          size={22}
+          color={editingPrediction?.verified ? "#2E7D32" : "#666"}
+        />
+        <Text style={styles.verifyText}>Mark as Verified</Text>
+      </TouchableOpacity>
+
             <View style={styles.modalButtons}>
               <TouchableOpacity style={styles.saveButton} onPress={saveEdit}>
                 <Text style={styles.saveText}>Save</Text>
@@ -362,5 +386,14 @@ const styles = StyleSheet.create({
   },
   saveText: { color: "#fff", fontWeight: "600" },
   cancelText: { color: "#333", fontWeight: "600" },
-  
+  verifyRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  marginBottom: 15,
+},
+verifyText: {
+  marginLeft: 8,
+  fontSize: 15,
+  color: "#333",
+},
 });

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -7,9 +7,29 @@ import {
   TouchableOpacity,
   Image,
 } from "react-native";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { db } from "../firebaseConfig";
 import { mockObservations } from "../utils/mockData";
 
 export default function HomeScreen({ navigation }) {
+    const [verifiedPredictions, setVerifiedPredictions] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchVerifiedPredictions = async () => {
+      try {
+        const q = query(collection(db, "predictions"), where("verified", "==", true));
+        const snapshot = await getDocs(q);
+        const list = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        setVerifiedPredictions(list);
+      } catch (error) {
+        console.error("Error fetching verified predictions:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchVerifiedPredictions();
+  }, []);
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -41,38 +61,32 @@ export default function HomeScreen({ navigation }) {
           </View>
         </View>
 
-        {/* Recent Observations */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Observations</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.horizontalScroll}
-          >
-            {Array.isArray(mockObservations) &&
-              mockObservations.map((item) => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={styles.card}
-                  onPress={() => {
-                    const parentNav = navigation.getParent?.() ?? navigation;
-                    parentNav.navigate("ObservationDetails", { observation: item });
-                    console.log("➡️ navigating with:", item);
-                  }}
-                >
-                  {item.image && (
-                    <Image
-                      source={item.image}
-                      style={styles.cardImage}
-                      resizeMode="cover"
-                    />
-                  )}
-                  <Text style={styles.cardText}>{item.species}</Text>
-                  <Text style={styles.cardSubText}>{item.location}</Text>
-                </TouchableOpacity>
-              ))}
-          </ScrollView>
-        </View>
+{/*Recent Observations*/}
+<View style={styles.section}>
+  <Text style={styles.sectionTitle}>Recent Observations</Text>
+
+  <ScrollView
+    horizontal
+    showsHorizontalScrollIndicator={false}
+    contentContainerStyle={styles.horizontalScroll}
+  >
+    {verifiedPredictions.map((item) => (
+      <View key={item.id} style={styles.card}>
+        {item.imageUrl && (
+          <Image
+            source={{ uri: item.imageUrl }}
+            style={styles.cardImage}
+            resizeMode="cover"
+          />
+        )}
+        <Text style={styles.cardText}>{item.predicted_label}</Text>
+        <Text style={styles.cardSubText}>
+          Confidence: {item.confidence?.toFixed(1)}%
+        </Text>
+      </View>
+    ))}
+  </ScrollView>
+</View>
 
         {/* Featured Plants (optional placeholder) */}
         <View style={styles.section}>

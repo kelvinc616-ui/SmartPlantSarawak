@@ -147,6 +147,7 @@ export default function IdentifyScreen({ navigation }) {
       top_predictions: prediction.top_predictions || [],
       model_version: prediction.model_version,
       timestamp: serverTimestamp(),
+      verified: false,
     });
 
     // 🔹 6. Show result
