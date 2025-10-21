@@ -6,9 +6,15 @@ import {
   TouchableOpacity,
   Alert,
   StyleSheet,
+  ImageBackground,
   Image,
+  StatusBar,
 } from "react-native";
-import { signInWithEmailAndPassword, sendEmailVerification, signOut  } from "firebase/auth";
+import {
+  signInWithEmailAndPassword,
+  sendEmailVerification,
+  signOut,
+} from "firebase/auth";
 import { auth, db } from "../firebaseConfig";
 import { doc, getDoc } from "firebase/firestore";
 
@@ -25,56 +31,48 @@ export default function LoginScreen({ navigation }) {
 
     setLoading(true);
     try {
-      // Sign in user with Firebase Authentication
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-       // Check if email is verified
       if (!user.emailVerified) {
-      await signOut(auth); // immediately log out
-
-      Alert.alert("Email Not Verified","Please verify your email before logging in.",
-        [
-          {
-            text: "Resend Verification Link",
-            onPress: async () => {
-              try {
-                await sendEmailVerification(user);
-                Alert.alert("Verification Sent", "A new verification email has been sent to your inbox.");
-              } catch (error) {
-                console.error("Resend error:", error);
-                Alert.alert("Error", "Failed to resend verification email. Please try again later.");
-              }
+        await signOut(auth);
+        Alert.alert(
+          "Email Not Verified",
+          "Please verify your email before logging in.",
+          [
+            {
+              text: "Resend Verification Link",
+              onPress: async () => {
+                try {
+                  await sendEmailVerification(user);
+                  Alert.alert("Verification Sent", "Check your inbox.");
+                } catch (error) {
+                  console.error(error);
+                  Alert.alert("Error", "Could not resend verification email.");
+                }
+              },
             },
-          },
-          { text: "OK", style: "cancel" },
-        ]
-      );
+            { text: "OK", style: "cancel" },
+          ]
+        );
+        return;
+      }
 
-      return;
-    }
-
-      // Retrieve the user's Firestore profile
-      const docRef = doc(db, "users", user.uid);
-      const docSnap = await getDoc(docRef);
-
+      const docSnap = await getDoc(doc(db, "users", user.uid));
       if (docSnap.exists()) {
         const userData = docSnap.data();
-        console.log("✅ Logged in as:", userData);
-
-        // Role-based navigation logic
         if (userData.role === "admin") {
-          navigation.replace("AdminMain"); // Admin route
+          navigation.replace("AdminMain");
         } else if (userData.role === "public") {
-          navigation.replace("UserMain"); // Normal user route
+          navigation.replace("UserMain");
         } else {
-          Alert.alert("Error", "Unknown role assigned to this account.");
+          Alert.alert("Error", "Unknown role assigned.");
         }
       } else {
         Alert.alert("Error", "User profile not found in Firestore.");
       }
     } catch (error) {
-      console.error("❌ Login failed:", error.message);
+      console.error("Login failed:", error.message);
       Alert.alert("Login failed", error.message);
     } finally {
       setLoading(false);
@@ -82,33 +80,35 @@ export default function LoginScreen({ navigation }) {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.card}>
-        <Image
-          source={{
-            uri: "https://lh3.googleusercontent.com/aida-public/AB6AXuA1d9xszeE3ZENEvgyeJW8FqzLqCnb3HnQnilj6tQYG_cYz6Y5M6sxjU37ptb66WqYdod_nfoqF4bYB__LvT0102wrzs9HQ9HPOQnwuTo-NjMPv-9c5npu9mhhD0iF4cGN_jCplk0mIZyYbgy4chowe55UMODx4l2gL9bAvTHNZFXsvXwaDw0htkK6XjGpSfe9655gMoN09D19-ij9UMugIlsmwDzBJogu7y8epMDD63AXVm7tzpHpIfV18lZohzf5TEaK7CmwPv70",
-          }}
-          style={styles.headerImage}
-        />
+    <ImageBackground
+      source={
+        require("../assets/images/loginpagebg2.jpg")
+      }
+      style={styles.background}
+      resizeMode="cover"
+    >
+      <StatusBar barStyle="light-content" />
+      <View style={styles.overlay} />
 
+      <View style={styles.container}>
         <Text style={styles.title}>Welcome Back</Text>
         <Text style={styles.subtitle}>
-          Log in to continue your journey in protecting Sarawak’s biodiversity.
+          Continue your journey in protecting Sarawak’s biodiversity.
         </Text>
 
-        {/* Email Input */}
+        {/* Input Fields */}
         <TextInput
-          placeholder="Email Address"
           style={styles.input}
+          placeholder="Email Address"
+          placeholderTextColor="#D9F3E2"
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
         />
-
-        {/* Password Input */}
         <TextInput
-          placeholder="Password"
           style={styles.input}
+          placeholder="Password"
+          placeholderTextColor="#D9F3E2"
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -117,11 +117,11 @@ export default function LoginScreen({ navigation }) {
         {/* Login Button */}
         <TouchableOpacity
           onPress={handleLogin}
-          style={styles.loginButton}
+          style={[styles.button, loading && { opacity: 0.8 }]}
           disabled={loading}
         >
-          <Text style={styles.loginText}>
-            {loading ? "Logging in..." : "Login"}
+          <Text style={styles.buttonText}>
+            {loading ? "Logging in..." : "LOGIN"}
           </Text>
         </TouchableOpacity>
 
@@ -129,80 +129,76 @@ export default function LoginScreen({ navigation }) {
         <TouchableOpacity onPress={() => navigation.navigate("Register")}>
           <Text style={styles.signupText}>
             Don’t have an account?{" "}
-            <Text style={{ color: "#2E7D32", fontWeight: "700" }}>Sign up</Text>
+            <Text style={{ color: "#C8FACC", fontWeight: "700" }}>Sign up</Text>
           </Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </ImageBackground>
   );
 }
 
-// Styles
 const styles = StyleSheet.create({
-  container: {
+  background: {
     flex: 1,
-    backgroundColor: "#F7F8FA",
-    alignItems: "center",
     justifyContent: "center",
-    padding: 20,
-  },
-  card: {
-    width: "100%",
-    maxWidth: 400,
     alignItems: "center",
-    backgroundColor: "#fff",
-    borderRadius: 20,
-    padding: 20,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 5,
   },
-  headerImage: {
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.35)",
+  },
+  container: {
     width: "100%",
-    height: 160,
-    borderRadius: 12,
-    marginBottom: 16,
+    maxWidth: 380,
+    alignItems: "center",
+    padding: 24,
+    paddingTop: 75,
   },
   title: {
-    fontSize: 26,
-    fontWeight: "700",
-    color: "#1A202C",
-    textAlign: "center",
+  fontSize: 30,
+  color: "#E6F8EC",
+  fontWeight: "700",
+  marginBottom: 6,
   },
   subtitle: {
-    fontSize: 14,
-    color: "#4B5563",
-    textAlign: "center",
-    marginVertical: 10,
+  color: "#C8FACC",
+  fontSize: 15,
+  textAlign: "center",
+  marginBottom: 28,
+  paddingHorizontal: 12,
+  opacity: 0.9,
   },
   input: {
     width: "100%",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#D1D5DB",
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 12,
+    backgroundColor: "rgba(255, 255, 255, 0.12)",
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    color: "#fff",
     fontSize: 16,
-    color: "#1A202C",
-    marginVertical: 8,
+    marginBottom: 14,
   },
-  loginButton: {
-    backgroundColor: "#2E7D32",
-    borderRadius: 10,
+  button: {
+    width: "100%",
+    backgroundColor: "#5BA87D",
+    borderRadius: 12,
     paddingVertical: 14,
     alignItems: "center",
-    width: "100%",
     marginTop: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 10,
   },
-  loginText: {
-    color: "#fff",
+  buttonText: {
+    color: "#F2FFF7",
     fontWeight: "700",
     fontSize: 16,
   },
   signupText: {
     fontSize: 14,
-    color: "#4B5563",
-    marginTop: 16,
+    color: "#D9F3E2",
+    marginTop: 18,
   },
 });

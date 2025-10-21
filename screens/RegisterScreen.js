@@ -4,10 +4,13 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  Alert,
   StyleSheet,
-  ScrollView,
+  ImageBackground,
   KeyboardAvoidingView,
+  ScrollView,
   Platform,
+  StatusBar,
 } from "react-native";
 import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
 import { auth, db } from "../firebaseConfig";
@@ -18,172 +21,195 @@ export default function RegisterScreen({ navigation }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleRegister = async () => {
     if (!username.trim()) {
-      alert("Please enter a username.");
+      Alert.alert("Missing field", "Please enter a username.");
       return;
     }
     if (password !== confirmPassword) {
-      alert("Passwords do not match!");
+      Alert.alert("Password mismatch", "Passwords do not match!");
       return;
     }
 
     try {
+      setLoading(true);
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-       // send verification email
+      // Send verification email
       await sendEmailVerification(user);
 
-      //  Save extra data to Firestore (username, email, role)
+      // Save extra user data
       await setDoc(doc(db, "users", user.uid), {
         username: username.trim(),
         email: email.trim(),
-        role: "public", // default role
+        role: "public",
         createdAt: new Date(),
       });
 
-      alert("Registration successful! Please check your email and verify before logging in.");
+      Alert.alert("Success", "Check your email to verify your account.");
       navigation.replace("Login");
     } catch (error) {
-      alert("Registration failed: " + error.message);
+      Alert.alert("Registration failed", error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      style={{ flex: 1 }}
+    <ImageBackground
+      source={require("../assets/images/loginpagebg2.jpg")}
+      style={styles.background}
+      resizeMode="cover"
     >
-      <ScrollView contentContainerStyle={styles.container}>
-        <View style={styles.card}>
-          <Text style={styles.title}>Create an Account</Text>
-          <Text style={styles.subtitle}>
-            Join SmartPlant Sarawak and help protect our biodiversity.
-          </Text>
+      <StatusBar barStyle="light-content" />
+      <View style={styles.overlay} />
 
-          {/* Username */}
-          <TextInput
-            style={styles.input}
-            placeholder="Username"
-            placeholderTextColor="#6B7280"
-            value={username}
-            onChangeText={setUsername}
-          />
-
-          {/* Email */}
-          <TextInput
-            style={styles.input}
-            placeholder="Email Address"
-            placeholderTextColor="#6B7280"
-            keyboardType="email-address"
-            value={email}
-            onChangeText={setEmail}
-          />
-
-          {/* Password */}
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            placeholderTextColor="#6B7280"
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-          />
-
-          {/* Confirm Password */}
-          <TextInput
-            style={styles.input}
-            placeholder="Confirm Password"
-            placeholderTextColor="#6B7280"
-            secureTextEntry
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-          />
-
-          {/* Register Button */}
-          <TouchableOpacity style={styles.registerButton} onPress={handleRegister}>
-            <Text style={styles.registerText}>Register</Text>
-          </TouchableOpacity>
-
-          {/* Back to Login */}
-          <Text style={styles.footerText}>
-            Already have an account?
-            <Text
-              style={styles.loginLink}
-              onPress={() => navigation.navigate("Login")}
-            >
-              {" "}
-              Login
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={{ flex: 1, width: "100%" }}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContainer}>
+          <View style={styles.container}>
+            <Text style={styles.title}>Create an Account</Text>
+            <Text style={styles.subtitle}>
+              Join us in preserving Sarawak’s biodiversity.
             </Text>
-          </Text>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+
+            {/* Username */}
+            <TextInput
+              style={styles.input}
+              placeholder="Username"
+              placeholderTextColor="#D9F3E2"
+              value={username}
+              onChangeText={setUsername}
+            />
+
+            {/* Email */}
+            <TextInput
+              style={styles.input}
+              placeholder="Email Address"
+              placeholderTextColor="#D9F3E2"
+              keyboardType="email-address"
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+            />
+
+            {/* Password */}
+            <TextInput
+              style={styles.input}
+              placeholder="Password"
+              placeholderTextColor="#D9F3E2"
+              secureTextEntry
+              value={password}
+              onChangeText={setPassword}
+            />
+
+            {/* Confirm Password */}
+            <TextInput
+              style={styles.input}
+              placeholder="Confirm Password"
+              placeholderTextColor="#D9F3E2"
+              secureTextEntry
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+            />
+
+            {/* Register Button */}
+            <TouchableOpacity
+              style={[styles.button, loading && { opacity: 0.8 }]}
+              onPress={handleRegister}
+              disabled={loading}
+            >
+              <Text style={styles.buttonText}>
+                {loading ? "Registering..." : "REGISTER"}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Back to Login */}
+            <TouchableOpacity onPress={() => navigation.navigate("Login")}>
+              <Text style={styles.footerText}>
+                Already have an account?{" "}
+                <Text style={{ color: "#C8FACC", fontWeight: "700" }}>Login</Text>
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
-    backgroundColor: "#F7F8FA",
-    alignItems: "center",
+  background: {
+    flex: 1,
     justifyContent: "center",
-    padding: 20,
-  },
-  card: {
-    width: "100%",
-    maxWidth: 400,
     alignItems: "center",
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.35)", 
+  },
+  scrollContainer: {
+    flexGrow: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 60,
+  },
+  container: {
+    width: "100%",
+    maxWidth: 380,
+    alignItems: "center",
+    padding: 24,
   },
   title: {
-    fontSize: 26,
+    fontSize: 28,
+    color: "#E6F8EC",
     fontWeight: "700",
-    color: "#1A202C",
-    textAlign: "center",
-    marginBottom: 8,
+    marginBottom: 6,
   },
   subtitle: {
-    fontSize: 14,
-    color: "#4B5563",
+    color: "#C8FACC",
+    fontSize: 15,
     textAlign: "center",
-    marginBottom: 20,
+    marginBottom: 28,
+    paddingHorizontal: 12,
+    opacity: 0.9,
   },
   input: {
-    width: "90%",
-    maxWidth: 350,
-    backgroundColor: "#FFFFFF",
-    borderColor: "#D1D5DB",
-    borderWidth: 1,
-    borderRadius: 10,
+    width: "100%",
+    backgroundColor: "rgba(255, 255, 255, 0.12)",
+    borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 16,
+    color: "#fff",
     fontSize: 16,
-    color: "#1A202C",
-    marginVertical: 8,
+    marginBottom: 14,
   },
-  registerButton: {
-    width: "90%",
-    maxWidth: 350,
-    backgroundColor: "#2E7D32",
-    borderRadius: 10,
+  button: {
+    width: "100%",
+    backgroundColor: "#5BA87D",
+    borderRadius: 12,
     paddingVertical: 14,
     alignItems: "center",
-    marginTop: 16,
+    marginTop: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 10,
   },
-  registerText: {
-    color: "#fff",
+  buttonText: {
+    color: "#F2FFF7",
     fontWeight: "700",
     fontSize: 16,
   },
   footerText: {
-    fontSize: 13,
-    color: "#6B7280",
-    marginTop: 20,
-  },
-  loginLink: {
-    color: "#2E7D32",
-    fontWeight: "600",
+    fontSize: 14,
+    color: "#D9F3E2",
+    marginTop: 18,
   },
 });
