@@ -8,7 +8,7 @@ import {
   StyleSheet,
   Image,
 } from "react-native";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword, sendEmailVerification, signOut  } from "firebase/auth";
 import { auth, db } from "../firebaseConfig";
 import { doc, getDoc } from "firebase/firestore";
 
@@ -25,11 +25,36 @@ export default function LoginScreen({ navigation }) {
 
     setLoading(true);
     try {
-      // 🔹 1. Sign in user with Firebase Authentication
+      // Sign in user with Firebase Authentication
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // 🔹 2. Retrieve the user's Firestore profile
+       // Check if email is verified
+      if (!user.emailVerified) {
+      await signOut(auth); // immediately log out
+
+      Alert.alert("Email Not Verified","Please verify your email before logging in.",
+        [
+          {
+            text: "Resend Verification Link",
+            onPress: async () => {
+              try {
+                await sendEmailVerification(user);
+                Alert.alert("Verification Sent", "A new verification email has been sent to your inbox.");
+              } catch (error) {
+                console.error("Resend error:", error);
+                Alert.alert("Error", "Failed to resend verification email. Please try again later.");
+              }
+            },
+          },
+          { text: "OK", style: "cancel" },
+        ]
+      );
+
+      return;
+    }
+
+      // Retrieve the user's Firestore profile
       const docRef = doc(db, "users", user.uid);
       const docSnap = await getDoc(docRef);
 
@@ -37,7 +62,7 @@ export default function LoginScreen({ navigation }) {
         const userData = docSnap.data();
         console.log("✅ Logged in as:", userData);
 
-        // 🔹 3. Role-based navigation logic
+        // Role-based navigation logic
         if (userData.role === "admin") {
           navigation.replace("AdminMain"); // Admin route
         } else if (userData.role === "public") {
@@ -112,7 +137,7 @@ export default function LoginScreen({ navigation }) {
   );
 }
 
-// 💅 Styles
+// Styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,

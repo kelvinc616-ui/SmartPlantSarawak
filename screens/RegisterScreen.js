@@ -9,7 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
 import { auth, db } from "../firebaseConfig";
 import { setDoc, doc } from "firebase/firestore";
 
@@ -33,6 +33,9 @@ export default function RegisterScreen({ navigation }) {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
+       // send verification email
+      await sendEmailVerification(user);
+
       //  Save extra data to Firestore (username, email, role)
       await setDoc(doc(db, "users", user.uid), {
         username: username.trim(),
@@ -41,7 +44,7 @@ export default function RegisterScreen({ navigation }) {
         createdAt: new Date(),
       });
 
-      alert("Registration successful!");
+      alert("Registration successful! Please check your email and verify before logging in.");
       navigation.replace("Login");
     } catch (error) {
       alert("Registration failed: " + error.message);
