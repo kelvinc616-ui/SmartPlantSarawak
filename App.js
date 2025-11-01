@@ -1,9 +1,9 @@
 import React, { useEffect } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { Ionicons } from "@expo/vector-icons";
+import { onAuthStateChanged } from "firebase/auth";
 import { collection, getDocs } from "firebase/firestore";
-import { db } from "./firebaseConfig";
+import { auth, db } from "./firebaseConfig";
 
 // Screens
 import HomeScreen from "./screens/HomeScreen";
@@ -26,17 +26,22 @@ import AdminMain from "./navigation/AdminMain";
 const Stack = createNativeStackNavigator();
 
 export default function App() {
-  // ✅ Optional: Test Firestore connection on startup
+  // ✅ Firestore connection test AFTER user login
   useEffect(() => {
-    async function testFirebase() {
-      try {
-        const snapshot = await getDocs(collection(db, "users"));
-        console.log(`✅ Connected to Firestore! Found ${snapshot.size} user(s).`);
-      } catch (error) {
-        console.error("❌ Firestore connection failed:", error);
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        try {
+          const snapshot = await getDocs(collection(db, "users"));
+          console.log(`✅ Firestore connected. Found ${snapshot.size} user(s).`);
+        } catch (error) {
+          console.error("❌ Firestore connection failed:", error);
+        }
+      } else {
+        console.log("⚠️ Skipped Firestore test (user not logged in)");
       }
-    }
-    testFirebase();
+    });
+
+    return unsubscribe;
   }, []);
 
   return (
@@ -49,32 +54,39 @@ export default function App() {
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Register" component={RegisterScreen} />
 
-        {/* 🌿 Main User + Admin Navigators */}
+        {/* 🌿 Main User & Admin Navigators */}
         <Stack.Screen name="UserMain" component={UserMain} />
         <Stack.Screen name="AdminMain" component={AdminMain} />
 
-        {/* ⚙️ Additional Admin & Utility Screens */}
+        {/* ⚙️ Admin Utility Screens */}
         <Stack.Screen
           name="AdminDashboard"
           component={AdminDashboard}
-          options={{ title: "Admin Dashboard" }}
+          options={{ title: "Admin Dashboard", headerShown: true }}
+        />
+        <Stack.Screen
+          name="ManageUsers"
+          component={ManageUsers}
+          options={{ title: "Manage Users", headerShown: true }}
+        />
+        <Stack.Screen
+          name="ManagePredictions"
+          component={ManagePredictions}
+          options={{ title: "Manage Predictions", headerShown: true }}
         />
 
-        {/*for managing users*/}
-        <Stack.Screen name="ManageUsers" component={ManageUsers} /> 
-
-        {/*for managing user predictions*/}
-        <Stack.Screen name="ManagePredictions" component={ManagePredictions} />
-
+        {/* 🌦️ IoT Monitoring */}
         <Stack.Screen
           name="IoTMonitoring"
           component={IoTMonitoringScreen}
-          options={{ title: "IoT Monitoring" }}
+          options={{ title: "IoT Monitoring", headerShown: true }}
         />
+
+        {/* 🔍 Observation Details */}
         <Stack.Screen
           name="ObservationDetails"
           component={ObservationDetails}
-          options={{ title: "Observation Details" }}
+          options={{ title: "Observation Details", headerShown: true }}
         />
       </Stack.Navigator>
     </NavigationContainer>

@@ -6,30 +6,38 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
+  ActivityIndicator,
 } from "react-native";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 import { mockObservations } from "../utils/mockData";
 
 export default function HomeScreen({ navigation }) {
-    const [verifiedPredictions, setVerifiedPredictions] = useState([]);
+  const [recentPredictions, setRecentPredictions] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Fetch the latest predictions from Firestore
   useEffect(() => {
-    const fetchVerifiedPredictions = async () => {
+    const fetchPredictions = async () => {
       try {
-        const q = query(collection(db, "predictions"), where("verified", "==", true));
+        const q = query(
+          collection(db, "predictions"),
+          orderBy("timestamp", "desc"),
+          limit(5) // show the latest 5
+        );
         const snapshot = await getDocs(q);
         const list = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-        setVerifiedPredictions(list);
+        setRecentPredictions(list);
       } catch (error) {
-        console.error("Error fetching verified predictions:", error);
+        console.error("Error fetching predictions:", error);
       } finally {
         setLoading(false);
       }
     };
-    fetchVerifiedPredictions();
+
+    fetchPredictions();
   }, []);
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -61,34 +69,52 @@ export default function HomeScreen({ navigation }) {
           </View>
         </View>
 
-{/*Recent Observations*/}
-<View style={styles.section}>
-  <Text style={styles.sectionTitle}>Recent Observations</Text>
+        {/* 🪴 Recent Observations */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Recent Observations</Text>
 
-  <ScrollView
-    horizontal
-    showsHorizontalScrollIndicator={false}
-    contentContainerStyle={styles.horizontalScroll}
-  >
-    {verifiedPredictions.map((item) => (
-      <View key={item.id} style={styles.card}>
-        {item.imageUrl && (
-          <Image
-            source={{ uri: item.imageUrl }}
-            style={styles.cardImage}
-            resizeMode="cover"
-          />
-        )}
-        <Text style={styles.cardText}>{item.predicted_label}</Text>
-        <Text style={styles.cardSubText}>
-          Confidence: {item.confidence?.toFixed(1)}%
-        </Text>
-      </View>
-    ))}
-  </ScrollView>
-</View>
+          {loading ? (
+            <ActivityIndicator size="small" color="#15931b" />
+          ) : (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalScroll}
+            >
+              {recentPredictions.length === 0 ? (
+                <Text style={{ color: "#777" }}>No recent predictions yet.</Text>
+              ) : (
+                recentPredictions.map((item) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={styles.card}
+                    onPress={() =>
+                      navigation.navigate("ObservationDetails", {
+                        observation: item,
+                      })
+                    }
+                  >
+                    {item.imageUrl && (
+                      <Image
+                        source={{ uri: item.imageUrl }}
+                        style={styles.cardImage}
+                        resizeMode="cover"
+                      />
+                    )}
+                    <Text style={styles.cardText}>
+                      {item.predicted_label || "Unknown"}
+                    </Text>
+                    <Text style={styles.cardSubText}>
+                      Confidence: {item.confidence?.toFixed(1)}%
+                    </Text>
+                  </TouchableOpacity>
+                ))
+              )}
+            </ScrollView>
+          )}
+        </View>
 
-        {/* Featured Plants (optional placeholder) */}
+        {/* 🌿 Featured Section (for news/articles later) */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Featured Plants</Text>
           <ScrollView
@@ -100,7 +126,7 @@ export default function HomeScreen({ navigation }) {
               <View key={plant.id} style={styles.card}>
                 {plant.image && (
                   <Image
-                    source={plant.image}   // 
+                    source={plant.image}
                     style={styles.cardImage}
                     resizeMode="cover"
                   />
@@ -110,13 +136,12 @@ export default function HomeScreen({ navigation }) {
             ))}
           </ScrollView>
         </View>
-
       </ScrollView>
     </View>
   );
 }
 
-// Styles
+// 💅 Styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -162,14 +187,12 @@ const styles = StyleSheet.create({
   actionSecondaryText: { color: "#15931b", fontWeight: "700" },
   horizontalScroll: { paddingHorizontal: 12 },
   card: { width: 160, marginRight: 12 },
-
   cardImage: {
-  width: "100%",
-  height: 150,
-  borderRadius: 12,
-  backgroundColor: "#e0e0e0", 
+    width: "100%",
+    height: 150,
+    borderRadius: 12,
+    backgroundColor: "#e0e0e0",
   },
-
   cardText: {
     marginTop: 6,
     fontSize: 14,
