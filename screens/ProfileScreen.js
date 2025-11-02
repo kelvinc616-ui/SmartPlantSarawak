@@ -1,5 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { auth, db } from "../firebaseConfig";
 import { signOut } from "firebase/auth";
@@ -10,7 +17,6 @@ export default function ProfileScreen({ navigation }) {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Fetch user info from Firestore
   useEffect(() => {
     const fetchUserData = async () => {
       try {
@@ -34,7 +40,6 @@ export default function ProfileScreen({ navigation }) {
     fetchUserData();
   }, [user]);
 
-  // Logout
   const handleLogout = async () => {
     try {
       await signOut(auth);
@@ -74,6 +79,7 @@ export default function ProfileScreen({ navigation }) {
 
       {/* Actions */}
       <View style={styles.actions}>
+        {/* Edit Button */}
         <TouchableOpacity
           style={[styles.button, styles.editButton]}
           onPress={() => Alert.alert("Coming Soon", "Edit profile not yet available.")}
@@ -82,7 +88,20 @@ export default function ProfileScreen({ navigation }) {
           <Text style={styles.editText}>Edit Profile</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={[styles.button, styles.logoutButton]} onPress={handleLogout}>
+        {/* ✅ My Observations Button */}
+        <TouchableOpacity
+          style={[styles.button, styles.observationButton]}
+          onPress={() => navigation.navigate("MyObservations")}
+        >
+          <Ionicons name="leaf-outline" size={18} color="#fff" />
+          <Text style={styles.observationText}>My Observations</Text>
+        </TouchableOpacity>
+
+        {/* Logout Button */}
+        <TouchableOpacity
+          style={[styles.button, styles.logoutButton]}
+          onPress={handleLogout}
+        >
           <Ionicons name="log-out-outline" size={18} color="#fff" />
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
@@ -147,7 +166,18 @@ const styles = StyleSheet.create({
   },
   editButton: { backgroundColor: "rgba(21,147,27,0.1)" },
   editText: { color: "#15931b", fontWeight: "600", marginLeft: 6 },
-  logoutButton: { backgroundColor: "#15931b" },
+
+ 
+  observationButton: {
+    backgroundColor: "#15931b",
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  observationText: { color: "#fff", fontWeight: "700", marginLeft: 6 },
+
+  logoutButton: { backgroundColor: "#c62828" },
   logoutText: { color: "#fff", fontWeight: "700", marginLeft: 6 },
   loadingContainer: {
     flex: 1,

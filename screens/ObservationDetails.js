@@ -2,24 +2,22 @@ import React from "react";
 import { View, Text, StyleSheet, Image, ScrollView } from "react-native";
 
 export default function ObservationDetails({ route }) {
-  const params = route?.params ?? {};
-  const obs = params.observation ?? null;
+  const obs = route?.params?.observation ?? null;
 
-  console.log("🧾 route.params =", params);
-  console.log("🧪 obs =", obs);
+  console.log("🧪 Observation data =", obs);
 
   if (!obs) {
     return (
       <View style={styles.container}>
         <Text style={styles.error}>❌ No observation data found.</Text>
         <Text style={styles.hint}>
-          Try tapping a recent prediction again.
+          Try tapping on a recent prediction again.
         </Text>
       </View>
     );
   }
 
-  // Extract details
+  // 🔹 Safely extract all fields
   const {
     imageUrl,
     predicted_label,
@@ -30,42 +28,60 @@ export default function ObservationDetails({ route }) {
     model_version,
   } = obs;
 
+  // 🔹 Ensure confidence is displayed correctly (already in %)
   const formattedConfidence =
     typeof confidence === "number" ? confidence.toFixed(2) : "N/A";
 
+  // 🔹 Convert Firestore timestamp to readable format
   const formattedTime = timestamp?.seconds
     ? new Date(timestamp.seconds * 1000).toLocaleString()
     : "Unknown";
 
   return (
     <ScrollView style={styles.container}>
-      {/* Remote image from Firestore */}
+      {/* 🖼️ Image Section */}
       {imageUrl ? (
-        <Image source={{ uri: imageUrl }} style={styles.image} resizeMode="cover" />
+        <Image
+          source={{ uri: imageUrl }}
+          style={styles.image}
+          resizeMode="cover"
+        />
       ) : (
         <View style={[styles.image, styles.imagePlaceholder]}>
           <Text style={{ color: "#999" }}>No Image Available</Text>
         </View>
       )}
 
+      {/* 🌿 Prediction Details */}
       <Text style={styles.title}>
         {predicted_label || "Unknown Species"}
       </Text>
 
-      <Text style={styles.info}>
-        Confidence: {formattedConfidence}%
-      </Text>
-      <Text style={styles.info}>
-        Status: {verified ? "✅ Verified" : "⏳ Pending"}
-      </Text>
-      <Text style={styles.info}>
-        Model Version: {model_version || "v1"}
-      </Text>
-      <Text style={styles.info}>
-        Timestamp: {formattedTime}
-      </Text>
+      <View style={styles.detailsBox}>
+        <Text style={styles.info}>
+          Confidence: {formattedConfidence}%
+        </Text>
+        <Text style={styles.info}>
+          Status:{" "}
+          {verified ? (
+            <Text style={{ color: "#2E7D32", fontWeight: "700" }}>
+              ✅ Verified
+            </Text>
+          ) : (
+            <Text style={{ color: "#E6A800", fontWeight: "700" }}>
+              ⏳ Pending
+            </Text>
+          )}
+        </Text>
+        <Text style={styles.info}>
+          Model Version: {model_version || "v1"}
+        </Text>
+        <Text style={styles.info}>
+          Timestamp: {formattedTime}
+        </Text>
+      </View>
 
-      {/* Display Top 3 Predictions */}
+      {/* 📊 Top Predictions */}
       {top_predictions && top_predictions.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Top Predictions</Text>
@@ -75,7 +91,10 @@ export default function ObservationDetails({ route }) {
                 {index + 1}. {pred.label}
               </Text>
               <Text style={styles.predConfidence}>
-                {pred.confidence.toFixed(2)}%
+                {typeof pred.confidence === "number"
+                  ? pred.confidence.toFixed(2)
+                  : "—"}
+                %
               </Text>
             </View>
           ))}
@@ -85,8 +104,13 @@ export default function ObservationDetails({ route }) {
   );
 }
 
+// 💅 Styles
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: "#F7F8FA" },
+  container: {
+    flex: 1,
+    padding: 20,
+    backgroundColor: "#F7F8FA",
+  },
   image: {
     width: "100%",
     height: 260,
@@ -105,6 +129,16 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     textAlign: "center",
   },
+  detailsBox: {
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+    marginBottom: 20,
+  },
   info: {
     fontSize: 16,
     color: "#333",
@@ -116,9 +150,12 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     textAlign: "center",
   },
-  hint: { fontSize: 14, color: "#555", textAlign: "center" },
+  hint: {
+    fontSize: 14,
+    color: "#555",
+    textAlign: "center",
+  },
   section: {
-    marginTop: 20,
     backgroundColor: "#fff",
     padding: 16,
     borderRadius: 10,
@@ -126,6 +163,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
+    marginBottom: 30,
   },
   sectionTitle: {
     fontSize: 18,

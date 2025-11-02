@@ -17,6 +17,7 @@ import IoTMonitoringScreen from "./screens/IoTMonitoringScreen";
 import ObservationDetails from "./screens/ObservationDetails";
 import ManageUsers from "./screens/ManageUsers";
 import ManagePredictions from "./screens/ManagePredictions";
+import MyObservations from "./screens/MyObservations";
 
 // Tab Navigators
 import UserMain from "./navigation/UserMain";
@@ -26,23 +27,24 @@ import AdminMain from "./navigation/AdminMain";
 const Stack = createNativeStackNavigator();
 
 export default function App() {
-  // ✅ Firestore connection test AFTER user login
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        try {
-          const snapshot = await getDocs(collection(db, "users"));
-          console.log(`✅ Firestore connected. Found ${snapshot.size} user(s).`);
-        } catch (error) {
-          console.error("❌ Firestore connection failed:", error);
-        }
-      } else {
-        console.log("⚠️ Skipped Firestore test (user not logged in)");
-      }
-    });
+  async function testFirebase() {
+    const user = auth.currentUser;
+    if (!user) {
+      console.log("⚠️ Skipping Firestore test — no user logged in yet.");
+      return;
+    }
+    try {
+      const snapshot = await getDocs(collection(db, "users"));
+      console.log(`✅ Connected to Firestore! Found ${snapshot.size} user(s).`);
+    } catch (error) {
+      console.error("❌ Firestore connection failed:", error);
+    }
+  }
+  testFirebase();
+}, []);
 
-    return unsubscribe;
-  }, []);
+
 
   return (
     <NavigationContainer>
@@ -88,6 +90,13 @@ export default function App() {
           component={ObservationDetails}
           options={{ title: "Observation Details", headerShown: true }}
         />
+
+        <Stack.Screen
+          name="MyObservations"
+          component={MyObservations}
+          options={{ title: "My Observations" }}
+        />
+        
       </Stack.Navigator>
     </NavigationContainer>
   );

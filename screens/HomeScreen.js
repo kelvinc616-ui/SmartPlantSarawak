@@ -8,7 +8,14 @@ import {
   Image,
   ActivityIndicator,
 } from "react-native";
-import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  query,
+  where,
+  orderBy,
+  limit,
+} from "firebase/firestore";
 import { db } from "../firebaseConfig";
 import { mockObservations } from "../utils/mockData";
 
@@ -16,26 +23,26 @@ export default function HomeScreen({ navigation }) {
   const [recentPredictions, setRecentPredictions] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch the latest predictions from Firestore
+  // ✅ Fetch the latest verified predictions
   useEffect(() => {
-    const fetchPredictions = async () => {
+    async function fetchVerifiedPredictions() {
       try {
         const q = query(
           collection(db, "predictions"),
+          where("verified", "==", true),
           orderBy("timestamp", "desc"),
-          limit(5) // show the latest 5
+          limit(5)
         );
-        const snapshot = await getDocs(q);
-        const list = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        const snap = await getDocs(q);
+        const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
         setRecentPredictions(list);
-      } catch (error) {
-        console.error("Error fetching predictions:", error);
+      } catch (e) {
+        console.error("Error fetching predictions:", e);
       } finally {
         setLoading(false);
       }
-    };
-
-    fetchPredictions();
+    }
+    fetchVerifiedPredictions();
   }, []);
 
   return (
@@ -82,7 +89,9 @@ export default function HomeScreen({ navigation }) {
               contentContainerStyle={styles.horizontalScroll}
             >
               {recentPredictions.length === 0 ? (
-                <Text style={{ color: "#777" }}>No recent predictions yet.</Text>
+                <Text style={{ color: "#777" }}>
+                  No recent predictions yet.
+                </Text>
               ) : (
                 recentPredictions.map((item) => (
                   <TouchableOpacity
@@ -105,7 +114,11 @@ export default function HomeScreen({ navigation }) {
                       {item.predicted_label || "Unknown"}
                     </Text>
                     <Text style={styles.cardSubText}>
-                      Confidence: {item.confidence?.toFixed(1)}%
+                      Confidence:{" "}
+                      {typeof item.confidence === "number"
+                        ? item.confidence.toFixed(2)
+                        : "—"}
+                      %
                     </Text>
                   </TouchableOpacity>
                 ))
@@ -114,7 +127,7 @@ export default function HomeScreen({ navigation }) {
           )}
         </View>
 
-        {/* 🌿 Featured Section (for news/articles later) */}
+        {/* 🌿 Featured Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Featured Plants</Text>
           <ScrollView
