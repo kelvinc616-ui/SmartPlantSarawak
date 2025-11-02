@@ -9,19 +9,39 @@ export default function LoginScreen({ navigation }) {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // ✅ Basic email format validation
+  const isValidEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  // 🔐 Handle login
   const handleLogin = async () => {
+    // 1️⃣ Check for empty fields
     if (!email || !password) {
-      Alert.alert("Missing fields", "Please enter both email and password.");
+      Alert.alert("Missing Fields", "Please enter both email and password.");
+      return;
+    }
+
+    // 2️⃣ Validate email format
+    if (!isValidEmail(email)) {
+      Alert.alert("Invalid Email", "Please enter a valid email address (e.g., example@gmail.com).");
+      return;
+    }
+
+    // 3️⃣ Validate password length
+    if (password.length < 6) {
+      Alert.alert("Weak Password", "Password must be at least 6 characters long.");
       return;
     }
 
     setLoading(true);
     try {
-      // 1️⃣ Sign in user with Firebase Auth
+      // 4️⃣ Sign in user with Firebase Auth
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // 2️⃣ Fetch Firestore profile document
+      // 5️⃣ Fetch Firestore profile document
       const docRef = doc(db, "users", user.uid);
       const docSnap = await getDoc(docRef);
 
@@ -29,7 +49,7 @@ export default function LoginScreen({ navigation }) {
         const userData = docSnap.data();
         console.log("✅ Logged in as:", userData);
 
-        // 3️⃣ Role-based navigation
+        // 6️⃣ Role-based navigation
         if (userData.role === "admin") {
           navigation.replace("AdminDashboard");
         } else {
@@ -40,7 +60,22 @@ export default function LoginScreen({ navigation }) {
       }
     } catch (error) {
       console.error("❌ Login failed:", error.message);
-      Alert.alert("Login failed", error.message);
+
+      // 7️⃣ Friendlier Firebase error handling
+      switch (error.code) {
+        case "auth/invalid-email":
+          Alert.alert("Login failed", "Invalid email format.");
+          break;
+        case "auth/user-not-found":
+          Alert.alert("Login failed", "No user found with this email.");
+          break;
+        case "auth/wrong-password":
+          Alert.alert("Login failed", "Incorrect password. Please try again.");
+          break;
+        default:
+          Alert.alert("Login failed", error.message);
+          break;
+      }
     } finally {
       setLoading(false);
     }
@@ -49,27 +84,31 @@ export default function LoginScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <View style={styles.card}>
+        {/* 🌿 Header Image */}
         <Image
           source={{
             uri: "https://lh3.googleusercontent.com/aida-public/AB6AXuA1d9xszeE3ZENEvgyeJW8FqzLqCnb3HnQnilj6tQYG_cYz6Y5M6sxjU37ptb66WqYdod_nfoqF4bYB__LvT0102wrzs9HQ9HPOQnwuTo-NjMPv-9c5npu9mhhD0iF4cGN_jCplk0mIZyYbgy4chowe55UMODx4l2gL9bAvTHNZFXsvXwaDw0htkK6XjGpSfe9655gMoN09D19-ij9UMugIlsmwDzBJogu7y8epMDD63AXVm7tzpHpIfV18lZohzf5TEaK7CmwPv70",
           }}
           style={styles.headerImage}
         />
+
+        {/* 👋 Welcome Text */}
         <Text style={styles.title}>Welcome Back</Text>
         <Text style={styles.subtitle}>
           Log in to continue your journey in protecting Sarawak’s biodiversity.
         </Text>
 
-        {/* Email Input */}
+        {/* 📧 Email Input */}
         <TextInput
           placeholder="Email Address"
           style={styles.input}
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
+          keyboardType="email-address"
         />
 
-        {/* Password Input */}
+        {/* 🔒 Password Input */}
         <TextInput
           placeholder="Password"
           style={styles.input}
@@ -78,13 +117,16 @@ export default function LoginScreen({ navigation }) {
           secureTextEntry
         />
 
+        {/* 🔘 Login Button */}
         <TouchableOpacity onPress={handleLogin} style={styles.loginButton} disabled={loading}>
           <Text style={styles.loginText}>{loading ? "Logging in..." : "Login"}</Text>
         </TouchableOpacity>
 
+        {/* 🆕 Register Link */}
         <TouchableOpacity onPress={() => navigation.navigate("Register")}>
           <Text style={styles.signupText}>
-            Don’t have an account? <Text style={{ color: "#2E7D32", fontWeight: "700" }}>Sign up</Text>
+            Don’t have an account?{" "}
+            <Text style={{ color: "#2E7D32", fontWeight: "700" }}>Sign up</Text>
           </Text>
         </TouchableOpacity>
       </View>

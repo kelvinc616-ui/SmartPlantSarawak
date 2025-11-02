@@ -8,6 +8,7 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Alert, // ✅ Added Alert for clearer feedback
 } from "react-native";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "../firebaseConfig";
@@ -19,21 +20,59 @@ export default function RegisterScreen({ navigation }) {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
+  // ✅ Helper function to check if email is in valid format
+  const isValidEmail = (email) => {
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailPattern.test(email);
+  };
+
+  // ✅ Helper function for password strength
+  const isStrongPassword = (password) => {
+    // Minimum 6 chars, one uppercase, one lowercase, one number
+    const pattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/;
+    return pattern.test(password);
+  };
+
   const handleRegister = async () => {
-    if (!username.trim()) {
-      alert("Please enter a username.");
+    // 🟢 1. Check for empty fields
+    if (!username.trim() || !email.trim() || !password || !confirmPassword) {
+      Alert.alert("Missing Information", "Please fill in all the fields.");
       return;
     }
+
+    // 🟢 2. Validate username
+    if (username.length < 3) {
+      Alert.alert("Invalid Username", "Username must be at least 3 characters long.");
+      return;
+    }
+
+    // 🟢 3. Validate email format
+    if (!isValidEmail(email)) {
+      Alert.alert("Invalid Email", "Please enter a valid email address.");
+      return;
+    }
+
+    // 🟢 4. Validate password strength
+    if (!isStrongPassword(password)) {
+      Alert.alert(
+        "Weak Password",
+        "Password must be at least 6 characters and include uppercase, lowercase, and a number."
+      );
+      return;
+    }
+
+    // 🟢 5. Confirm password check
     if (password !== confirmPassword) {
-      alert("Passwords do not match!");
+      Alert.alert("Password Mismatch", "Passwords do not match!");
       return;
     }
 
     try {
+      // 🟢 6. Create account with Firebase
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      //  Save extra data to Firestore (username, email, role)
+      // 🟢 7. Save user info in Firestore
       await setDoc(doc(db, "users", user.uid), {
         username: username.trim(),
         email: email.trim(),
@@ -41,10 +80,21 @@ export default function RegisterScreen({ navigation }) {
         createdAt: new Date(),
       });
 
-      alert("Registration successful!");
+      Alert.alert("Success", "Registration successful!");
       navigation.replace("Login");
     } catch (error) {
-      alert("Registration failed: " + error.message);
+      // 🟢 8. Catch Firebase registration errors
+      let message = error.message;
+
+      if (message.includes("email-already-in-use")) {
+        message = "This email is already registered.";
+      } else if (message.includes("invalid-email")) {
+        message = "The email format is invalid.";
+      } else if (message.includes("weak-password")) {
+        message = "Password should be at least 6 characters.";
+      }
+
+      Alert.alert("Registration Failed", message);
     }
   };
 
@@ -60,7 +110,7 @@ export default function RegisterScreen({ navigation }) {
             Join SmartPlant Sarawak and help protect our biodiversity.
           </Text>
 
-          {/* Username */}
+          {/* 🟢 Username Input */}
           <TextInput
             style={styles.input}
             placeholder="Username"
@@ -69,17 +119,18 @@ export default function RegisterScreen({ navigation }) {
             onChangeText={setUsername}
           />
 
-          {/* Email */}
+          {/* 🟢 Email Input */}
           <TextInput
             style={styles.input}
             placeholder="Email Address"
             placeholderTextColor="#6B7280"
             keyboardType="email-address"
+            autoCapitalize="none"
             value={email}
             onChangeText={setEmail}
           />
 
-          {/* Password */}
+          {/* 🟢 Password Input */}
           <TextInput
             style={styles.input}
             placeholder="Password"
@@ -89,7 +140,7 @@ export default function RegisterScreen({ navigation }) {
             onChangeText={setPassword}
           />
 
-          {/* Confirm Password */}
+          {/* 🟢 Confirm Password Input */}
           <TextInput
             style={styles.input}
             placeholder="Confirm Password"
@@ -99,20 +150,19 @@ export default function RegisterScreen({ navigation }) {
             onChangeText={setConfirmPassword}
           />
 
-          {/* Register Button */}
+          {/* 🟢 Register Button */}
           <TouchableOpacity style={styles.registerButton} onPress={handleRegister}>
             <Text style={styles.registerText}>Register</Text>
           </TouchableOpacity>
 
-          {/* Back to Login */}
+          {/* 🟢 Back to Login */}
           <Text style={styles.footerText}>
             Already have an account?
             <Text
               style={styles.loginLink}
               onPress={() => navigation.navigate("Login")}
             >
-              {" "}
-              Login
+              {" "}Login
             </Text>
           </Text>
         </View>
