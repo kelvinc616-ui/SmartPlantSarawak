@@ -13,6 +13,7 @@ import {
   Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import MapView, { Marker } from "react-native-maps";
 import {
   collection,
   getDocs,
@@ -30,14 +31,21 @@ export default function ManagePredictions() {
   const [sortOrder, setSortOrder] = useState("desc");
   const [editingPrediction, setEditingPrediction] = useState(null);
   const [newLabel, setNewLabel] = useState("");
+  const [showMap, setShowMap] = useState(false); // 🗺️ Map preview modal
 
   const fetchPredictions = async () => {
     try {
       const snapshot = await getDocs(collection(db, "predictions"));
-      const list = snapshot.docs.map((docSnap) => ({
+      const list = snapshot.docs.map((docSnap) => {
+      const data = docSnap.data();
+      const coords = data.location || {};
+      return {
         id: docSnap.id,
-        ...docSnap.data(),
-      }));
+        ...data,
+        lat: coords.latitude,
+        lng: coords.longitude,
+      };
+    });
       setPredictions(list);
       setFiltered(list);
     } catch (error) {
@@ -103,32 +111,44 @@ export default function ManagePredictions() {
     setNewLabel(item.predicted_label);
   };
 
-const saveEdit = async () => {
-  if (!editingPrediction) return;
-  try {
-    const docRef = doc(db, "predictions", editingPrediction.id);
-    await updateDoc(docRef, {
-      predicted_label: newLabel,
-      verified_label: editingPrediction.verified_label || false,
-    });
+  const saveEdit = async () => {
+    if (!editingPrediction) return;
+    try {
+      const docRef = doc(db, "predictions", editingPrediction.id);
+      await updateDoc(docRef, {
+        predicted_label: newLabel,
+        verified_label: editingPrediction.verified_label || false,
+        verified_location: editingPrediction.verified_location || false,
+        // 🔒 Default share_location = false whenever location verified
+        share_location:
+          editingPrediction.verified_location === true
+            ? false
+            : editingPrediction.share_location || false,
+      });
 
-    const updated = predictions.map((p) =>
-      p.id === editingPrediction.id
-        ? { ...p, predicted_label: newLabel, verified_label: editingPrediction.verified_label }
-        : p
-    );
+      const updated = predictions.map((p) =>
+        p.id === editingPrediction.id
+          ? {
+              ...p,
+              predicted_label: newLabel,
+              verified_label: editingPrediction.verified_label,
+              verified_location: editingPrediction.verified_location,
+              share_location:
+                editingPrediction.verified_location === true ? false : editingPrediction.share_location,
+            }
+          : p
+      );
 
-    setPredictions(updated);
-    setFiltered(updated);
-    setEditingPrediction(null);
-    setNewLabel("");
-    Alert.alert("Updated", "Prediction updated successfully.");
-  } catch (error) {
-    console.error("Error updating prediction:", error);
-    Alert.alert("Error", "Failed to update prediction.");
-  }
-};
-
+      setPredictions(updated);
+      setFiltered(updated);
+      setEditingPrediction(null);
+      setNewLabel("");
+      Alert.alert("Updated", "Prediction updated successfully.");
+    } catch (error) {
+      console.error("Error updating prediction:", error);
+      Alert.alert("Error", "Failed to update prediction.");
+    }
+  };
 
   useEffect(() => {
     fetchPredictions();
@@ -145,7 +165,6 @@ const saveEdit = async () => {
 
   return (
     <ScrollView style={styles.container}>
-
       <Text style={styles.title}>🌱 Manage Predictions</Text>
 
       {/* Search & Sort Controls */}
@@ -184,7 +203,10 @@ const saveEdit = async () => {
             <View style={styles.info}>
               <Text style={styles.label}>
                 {item.predicted_label}{" "}
-                {item.verified_label && <Text style={styles.verified_label}>✔ Verified</Text>}
+                {item.verified_label && <Text style={styles.verified_label}>✔ Label</Text>}
+                {item.verified_location && (
+                  <Text style={styles.verified_location}> 🌍 Location</Text>
+                )}
               </Text>
               <Text style={styles.confidence}>
                 Confidence: {item.confidence?.toFixed(2)}%
@@ -194,17 +216,6 @@ const saveEdit = async () => {
               </Text>
               <Text style={styles.model}>Model: {item.model_version}</Text>
               <Text style={styles.userId}>User ID: {item.userId}</Text>
-
-              {item.top_predictions && (
-                <View style={styles.topPredictions}>
-                  <Text style={styles.subheading}>Top Predictions:</Text>
-                  {item.top_predictions.map((tp, index) => (
-                    <Text key={index} style={styles.topItem}>
-                      • {tp.label} ({tp.confidence.toFixed(2)}%)
-                    </Text>
-                  ))}
-                </View>
-              )}
             </View>
 
             <View style={styles.actions}>
@@ -230,7 +241,7 @@ const saveEdit = async () => {
       <Modal visible={!!editingPrediction} transparent animationType="slide">
         <View style={styles.modalContainer}>
           <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>Edit Prediction Label</Text>
+            <Text style={styles.modalTitle}>Edit Prediction</Text>
             <TextInput
               style={styles.modalInput}
               value={newLabel}
@@ -238,23 +249,64 @@ const saveEdit = async () => {
               placeholder="Enter new label"
               placeholderTextColor="#999"
             />
-            {/* Verify Checkbox */}
-      <TouchableOpacity
-        style={styles.verifyRow}
-        onPress={() =>
-          setEditingPrediction((prev) => ({
-            ...prev,
-            verified_label: !prev.verified_label,
-          }))
-        }
-      >
-        <Ionicons
-          name={editingPrediction?.verified_label ? "checkbox-outline" : "square-outline"}
-          size={22}
-          color={editingPrediction?.verified_label ? "#2E7D32" : "#666"}
-        />
-        <Text style={styles.verifyText}>Mark as Verified</Text>
-      </TouchableOpacity>
+
+            {/* ✅ Verify Label Checkbox */}
+            <TouchableOpacity
+              style={styles.verifyRow}
+              onPress={() =>
+                setEditingPrediction((prev) => ({
+                  ...prev,
+                  verified_label: !prev.verified_label,
+                }))
+              }
+            >
+              <Ionicons
+                name={editingPrediction?.verified_label ? "checkbox-outline" : "square-outline"}
+                size={22}
+                color={editingPrediction?.verified_label ? "#2E7D32" : "#666"}
+              />
+              <Text style={styles.verifyText}>Mark Label as Verified</Text>
+            </TouchableOpacity>
+
+            {/* 🌍 Verify Location Checkbox */}
+            <TouchableOpacity
+              style={styles.verifyRow}
+              onPress={() =>
+                setEditingPrediction((prev) => ({
+                  ...prev,
+                  verified_location: !prev.verified_location,
+                }))
+              }
+            >
+              <Ionicons
+                name={editingPrediction?.verified_location ? "checkbox-outline" : "square-outline"}
+                size={22}
+                color={editingPrediction?.verified_location ? "#2E7D32" : "#666"}
+              />
+              <Text style={styles.verifyText}>Mark Location as Verified</Text>
+            </TouchableOpacity>
+
+            {/* 🗺️ View Location */}
+            {editingPrediction?.lat && editingPrediction?.lng ? (
+              <TouchableOpacity
+                style={[styles.verifyRow, { justifyContent: "center", marginBottom: 10 }]}
+                onPress={() => setShowMap(true)}
+              >
+                <Ionicons name="map-outline" size={22} color="#00796B" />
+                <Text style={[styles.verifyText, { marginLeft: 6 }]}>View Location</Text>
+              </TouchableOpacity>
+            ) : (
+              <Text
+                style={{
+                  color: "#999",
+                  fontSize: 13,
+                  textAlign: "center",
+                  marginBottom: 10,
+                }}
+              >
+                No location data available
+              </Text>
+            )}
 
             <View style={styles.modalButtons}>
               <TouchableOpacity style={styles.saveButton} onPress={saveEdit}>
@@ -267,6 +319,44 @@ const saveEdit = async () => {
                 <Text style={styles.cancelText}>Cancel</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 🗺️ Map Preview Modal */}
+      <Modal visible={showMap} transparent animationType="slide">
+        <View style={styles.modalContainer}>
+          <View style={styles.mapBox}>
+            <Text style={styles.modalTitle}>Location Preview</Text>
+            {editingPrediction?.lat && editingPrediction?.lng ? (
+              <MapView
+                style={styles.previewMap}
+                initialRegion={{
+                  latitude: editingPrediction.lat,
+                  longitude: editingPrediction.lng,
+                  latitudeDelta: 0.01,
+                  longitudeDelta: 0.01,
+                }}
+              >
+                <Marker
+                  coordinate={{
+                    latitude: editingPrediction.lat,
+                    longitude: editingPrediction.lng,
+                  }}
+                  title={editingPrediction.predicted_label}
+                />
+              </MapView>
+            ) : (
+              <Text style={{ textAlign: "center", color: "#999" }}>
+                No location available
+              </Text>
+            )}
+            <TouchableOpacity
+              style={[styles.cancelButton, { alignSelf: "center", marginTop: 15 }]}
+              onPress={() => setShowMap(false)}
+            >
+              <Text style={styles.cancelText}>Close Map</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -327,13 +417,11 @@ const styles = StyleSheet.create({
   info: { marginBottom: 8 },
   label: { fontSize: 16, fontWeight: "600", color: "#1a1a1a" },
   verified_label: { color: "#2E7D32", fontWeight: "700" },
+  verified_location: { color: "#00796B", fontWeight: "700" },
   confidence: { fontSize: 13, color: "#2E7D32" },
   timestamp: { fontSize: 12, color: "#666", marginTop: 3 },
   model: { fontSize: 12, color: "#888" },
   userId: { fontSize: 11, color: "#999", marginTop: 2 },
-  topPredictions: { marginTop: 8 },
-  subheading: { fontSize: 13, fontWeight: "600", color: "#333" },
-  topItem: { fontSize: 12, color: "#555", marginLeft: 4 },
   actions: { flexDirection: "row", justifyContent: "flex-end", gap: 8 },
   editButton: {
     backgroundColor: "#1976D2",
@@ -387,13 +475,30 @@ const styles = StyleSheet.create({
   saveText: { color: "#fff", fontWeight: "600" },
   cancelText: { color: "#333", fontWeight: "600" },
   verifyRow: {
-  flexDirection: "row",
-  alignItems: "center",
-  marginBottom: 15,
-},
-verifyText: {
-  marginLeft: 8,
-  fontSize: 15,
-  color: "#333",
-},
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 15,
+  },
+  verifyText: {
+    marginLeft: 8,
+    fontSize: 15,
+    color: "#333",
+  },
+  mapBox: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 15,
+    width: "90%",
+    height: 400,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+  },
+  previewMap: {
+    width: "100%",
+    height: 300,
+    borderRadius: 10,
+    marginTop: 10,
+  },
 });

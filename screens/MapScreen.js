@@ -24,21 +24,19 @@ export default function MapScreen({ navigation }) {
   const [loadingPins, setLoadingPins] = useState(true);
   const [userRole, setUserRole] = useState("user"); // default role
 
-  // ✅ Fetch current user role (to know if admin)
+  // Fetch current user role
   useEffect(() => {
     const fetchRole = async () => {
       const user = auth.currentUser;
       if (!user) return;
       const userRef = doc(db, "users", user.uid);
       const snap = await getDoc(userRef);
-      if (snap.exists()) {
-        setUserRole(snap.data().role || "user");
-      }
+      if (snap.exists()) setUserRole(snap.data().role || "user");
     };
     fetchRole();
   }, []);
 
-  // ✅ Get user's location
+  // Get user's current location
   useEffect(() => {
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -57,37 +55,48 @@ export default function MapScreen({ navigation }) {
     })();
   }, []);
 
-  // ✅ Fetch map markers from Firestore
+  // Fetch map markers (based on role)
   useEffect(() => {
     const fetchPins = async () => {
       try {
         const predictionsRef = collection(db, "predictions");
         let q;
-
         if (userRole === "admin") {
           q = query(predictionsRef);
         } else {
-          // Only fully verified pins visible to public users
           q = query(
             predictionsRef,
             where("verified_label", "==", true),
-            where("verified_location", "==", true)
+            where("verified_location", "==", true),
+            where("share_location", "==", true)
           );
         }
 
         const snapshot = await getDocs(q);
         const list = snapshot.docs
-          .filter((d) => d.data().lat && d.data().lng) // only entries with coordinates
-          .map((d) => ({
-            id: d.id,
-            title: d.data().corrected_label || d.data().predicted_label || "Unknown Species",
-            verified_label: d.data().verified_label,
-            verified_location: d.data().verified_location,
-            lat: d.data().lat,
-            lng: d.data().lng,
-            coordinate: { latitude: d.data().lat, longitude: d.data().lng },
-            userId: d.data().userId,
-          }));
+          .map((d) => {
+            const data = d.data();
+            const loc = data.location || {};
+            const lat = loc.latitude;
+            const lng = loc.longitude;
+            return {
+              id: d.id,
+              title: data.corrected_label || data.predicted_label || "Unknown Species",
+              imageUrl: data.imageUrl || null,
+              confidence: data.confidence || null,
+              timestamp: data.timestamp || null,
+              model_version: data.model_version || "v1",
+              address: data.address || "Unknown Location",
+              lat,
+              lng,
+              coordinate: lat && lng ? { latitude: lat, longitude: lng } : null,
+              verified_label: data.verified_label,
+              verified_location: data.verified_location,
+              share_location: data.share_location,
+              userId: data.userId,
+            };
+          })
+          .filter((m) => m.coordinate);
 
         setMarkers(list);
       } catch (err) {
@@ -100,7 +109,7 @@ export default function MapScreen({ navigation }) {
     fetchPins();
   }, [userRole]);
 
-  // 🔍 Local search
+  // Search for a place by name
   const handleSearch = async () => {
     const trimmed = queryText.trim();
     if (!trimmed) return Alert.alert("Search", "Enter a location name.");
@@ -123,7 +132,7 @@ export default function MapScreen({ navigation }) {
     }
   };
 
-  // 🎯 Center to user
+  // Center map to user's location
   const handleCenterToUser = () => {
     if (!userLocation) return;
     mapRef.current?.animateToRegion({
@@ -134,7 +143,7 @@ export default function MapScreen({ navigation }) {
     });
   };
 
-  // 🎨 Marker color logic
+  // Marker color logic
   const getMarkerColor = (m) => {
     if (m.verified_label && m.verified_location) return "green";
     if (m.verified_label && !m.verified_location) return "orange";
@@ -151,7 +160,7 @@ export default function MapScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      {/* Search bar */}
+      {/* Search Bar */}
       <View style={styles.searchBarWrap}>
         <View style={styles.searchBar}>
           <Ionicons name="search" size={18} color="#666" style={{ marginRight: 8 }} />
@@ -174,7 +183,7 @@ export default function MapScreen({ navigation }) {
         </View>
       </View>
 
-      {/* Map */}
+      {/* Map View */}
       <MapView
         ref={mapRef}
         style={styles.map}
@@ -200,39 +209,39 @@ export default function MapScreen({ navigation }) {
                   : undefined
               }
               pinColor={getMarkerColor(m)}
+              // helps Android render the callout above the map surface
+              tracksViewChanges={false}
+              calloutAnchor={{ x: 0.5, y: 0 }} // lift the bubble above the pin head
             >
+              {/* DEFAULT, NON-TOOLTIP CALLOUT (most reliable on Android) */}
               <Callout
-                onPress={() =>
-                  navigation.navigate("ObservationDetails", {
-                    observation: m,
-                  })
-                }
+                onPress={() => navigation.navigate("ObservationDetails", { observation: m })}
               >
-                <View style={styles.calloutContainer}>
+                <View style={styles.defaultCallout}>
                   <Text style={styles.calloutTitle}>{m.title}</Text>
                   {userRole === "admin" && (
                     <>
-                      <Text style={styles.calloutDescription}>
-                        Label verified: {m.verified_label ? "Yes" : "No"}
+                      <Text style={styles.calloutRow}>
+                        Label Verified: {m.verified_label ? "Yes" : "No"}
                       </Text>
-                      <Text style={styles.calloutDescription}>
-                        Location verified: {m.verified_location ? "Yes" : "No"}
+                      <Text style={styles.calloutRow}>
+                        Location Verified: {m.verified_location ? "Yes" : "No"}
                       </Text>
                     </>
                   )}
-                  <Text style={styles.calloutLink}>View Details →</Text>
+                  <Text style={styles.calloutLink}>Tap for details →</Text>
                 </View>
               </Callout>
             </Marker>
           ))}
       </MapView>
 
-      {/* Center to My Location */}
+      {/* Center to User Button */}
       <TouchableOpacity style={styles.centerButton} onPress={handleCenterToUser}>
         <Ionicons name="locate-outline" size={26} color="#fff" />
       </TouchableOpacity>
 
-      {/* ➕ Add Observation Button */}
+      {/* Add Observation */}
       <TouchableOpacity
         style={styles.addButton}
         onPress={() => navigation.navigate("SelectPredictionForLocation")}
@@ -259,6 +268,7 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 20, fontWeight: "700", color: "#15931b" },
   iconButton: { padding: 6 },
   map: { flex: 1 },
+
   searchBarWrap: {
     position: "absolute",
     top: Platform.OS === "ios" ? 110 : 100,
@@ -284,10 +294,32 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginLeft: 8,
   },
-  calloutContainer: { width: 180 },
-  calloutTitle: { fontWeight: "700", fontSize: 14, color: "#112112" },
-  calloutDescription: { fontSize: 12, color: "#5c6c5e" },
-  calloutLink: { marginTop: 4, color: "#15931b", fontWeight: "600", fontSize: 12 },
+
+  // callout
+  defaultCallout: {
+    width: 190,
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    padding: 10,
+    borderColor: "rgba(0,0,0,0.15)",
+    borderWidth: 1,
+  },
+  calloutTitle: {
+    fontWeight: "700",
+    fontSize: 14,
+    color: "#15931b",
+    marginBottom: 4,
+    textAlign: "center",
+  },
+  calloutRow: { fontSize: 12, color: "#333" },
+  calloutLink: {
+    marginTop: 6,
+    color: "#15931b",
+    fontWeight: "600",
+    fontSize: 12,
+    textAlign: "center",
+  },
+
   addButton: {
     position: "absolute",
     bottom: 30,

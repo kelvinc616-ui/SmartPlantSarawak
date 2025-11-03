@@ -10,25 +10,32 @@ export default function ObservationDetails({ route }) {
     return (
       <View style={styles.container}>
         <Text style={styles.error}>❌ No observation data found.</Text>
-        <Text style={styles.hint}>
-          Try tapping on a recent prediction again.
-        </Text>
+        <Text style={styles.hint}>Try tapping on a recent prediction again.</Text>
       </View>
     );
   }
 
-  // 🔹 Safely extract all fields
+  // 🔹 Safely extract all fields (with fallbacks)
   const {
     imageUrl,
+    title,
     predicted_label,
+    corrected_label,
     confidence,
     top_predictions,
     verified_label,
+    verified_location,
     timestamp,
     model_version,
+    address,
+    share_location,
   } = obs;
 
-  // 🔹 Ensure confidence is displayed correctly (already in %)
+  // 🔹 Determine display name
+  const displayName =
+    title || corrected_label || predicted_label || "Unknown Species";
+
+  // 🔹 Ensure confidence is displayed correctly
   const formattedConfidence =
     typeof confidence === "number" ? confidence.toFixed(2) : "N/A";
 
@@ -52,32 +59,42 @@ export default function ObservationDetails({ route }) {
         </View>
       )}
 
-      {/* 🌿 Prediction Details */}
-      <Text style={styles.title}>
-        {predicted_label || "Unknown Species"}
-      </Text>
+      {/* 🌿 Title */}
+      <Text style={styles.title}>{displayName}</Text>
 
+      {/* 🌍 Details */}
       <View style={styles.detailsBox}>
         <Text style={styles.info}>
           Confidence: {formattedConfidence}%
         </Text>
         <Text style={styles.info}>
-          Status:{" "}
+          Label Verified:{" "}
           {verified_label ? (
-            <Text style={{ color: "#2E7D32", fontWeight: "700" }}>
-              ✅ Verified
-            </Text>
+            <Text style={{ color: "#2E7D32", fontWeight: "700" }}>✅ Yes</Text>
           ) : (
-            <Text style={{ color: "#E6A800", fontWeight: "700" }}>
-              ⏳ Pending
-            </Text>
+            <Text style={{ color: "#E6A800", fontWeight: "700" }}>⏳ No</Text>
           )}
         </Text>
         <Text style={styles.info}>
-          Model Version: {model_version || "v1"}
+          Location Verified:{" "}
+          {verified_location ? (
+            <Text style={{ color: "#2E7D32", fontWeight: "700" }}>✅ Yes</Text>
+          ) : (
+            <Text style={{ color: "#E6A800", fontWeight: "700" }}>⏳ No</Text>
+          )}
         </Text>
         <Text style={styles.info}>
-          Timestamp: {formattedTime}
+          Share Location:{" "}
+          {share_location ? (
+            <Text style={{ color: "#2E7D32", fontWeight: "700" }}>🌍 Public</Text>
+          ) : (
+            <Text style={{ color: "#E53935", fontWeight: "700" }}>🔒 Private</Text>
+          )}
+        </Text>
+        <Text style={styles.info}>Model Version: {model_version || "v1"}</Text>
+        <Text style={styles.info}>Timestamp: {formattedTime}</Text>
+        <Text style={styles.info}>
+          Address: {address || "No address available"}
         </Text>
       </View>
 

@@ -134,7 +134,7 @@ export default function IdentifyScreen({ navigation }) {
         timestamp: serverTimestamp(),
         verified_label: false,
         verified_location: false,
-        location_shared: false,
+        share_location: false,
       });
 
       console.log("✅ Prediction saved with ID:", docRef.id);
