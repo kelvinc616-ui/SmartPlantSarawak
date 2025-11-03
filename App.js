@@ -18,6 +18,8 @@ import ObservationDetails from "./screens/ObservationDetails";
 import ManageUsers from "./screens/ManageUsers";
 import ManagePredictions from "./screens/ManagePredictions";
 import MyObservations from "./screens/MyObservations";
+import SelectPredictionForLocation from "./screens/SelectPredictionForLocation";
+import AddLocationScreen from "./screens/AddLocationScreen";
 
 // Tab Navigators
 import UserMain from "./navigation/UserMain";
@@ -96,7 +98,18 @@ export default function App() {
           component={MyObservations}
           options={{ title: "My Observations" }}
         />
-        
+
+        {/* New location-related screens */}
+        <Stack.Screen 
+          name="SelectPredictionForLocation" 
+          component={SelectPredictionForLocation} 
+        />
+
+        <Stack.Screen 
+          name="AddLocation" 
+          component={AddLocationScreen} 
+        />
+
       </Stack.Navigator>
     </NavigationContainer>
   );

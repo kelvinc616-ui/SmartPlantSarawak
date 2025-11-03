@@ -29,7 +29,7 @@ export default function HomeScreen({ navigation }) {
       try {
         const q = query(
           collection(db, "predictions"),
-          where("verified", "==", true),
+          where("verified_label", "==", true),
           orderBy("timestamp", "desc"),
           limit(5)
         );

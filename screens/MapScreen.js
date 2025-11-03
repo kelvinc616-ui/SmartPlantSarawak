@@ -12,29 +12,33 @@ import {
 import MapView, { Marker, Callout, PROVIDER_GOOGLE } from "react-native-maps";
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
+import { auth, db } from "../firebaseConfig";
+import { collection, getDocs, query, where, getDoc, doc } from "firebase/firestore";
 
 export default function MapScreen({ navigation }) {
   const mapRef = useRef(null);
-  const [markers, setMarkers] = useState([
-    {
-      id: 1,
-      title: "Nepenthes rafflesiana",
-      description: "Kubah National Park",
-      coordinate: { latitude: 1.608, longitude: 110.188 },
-    },
-    {
-      id: 2,
-      title: "Shorea macrophylla",
-      description: "Semenggoh Nature Reserve",
-      coordinate: { latitude: 1.416, longitude: 110.329 },
-    },
-  ]);
-
+  const [markers, setMarkers] = useState([]);
   const [userLocation, setUserLocation] = useState(null);
-  const [query, setQuery] = useState("");
+  const [queryText, setQueryText] = useState("");
   const [searching, setSearching] = useState(false);
+  const [loadingPins, setLoadingPins] = useState(true);
+  const [userRole, setUserRole] = useState("user"); // default role
 
-  // Get user's location on mount
+  // ✅ Fetch current user role (to know if admin)
+  useEffect(() => {
+    const fetchRole = async () => {
+      const user = auth.currentUser;
+      if (!user) return;
+      const userRef = doc(db, "users", user.uid);
+      const snap = await getDoc(userRef);
+      if (snap.exists()) {
+        setUserRole(snap.data().role || "user");
+      }
+    };
+    fetchRole();
+  }, []);
+
+  // ✅ Get user's location
   useEffect(() => {
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -42,32 +46,68 @@ export default function MapScreen({ navigation }) {
         Alert.alert("Permission denied", "Location access is required.");
         return;
       }
-      const location = await Location.getCurrentPositionAsync({});
-      setUserLocation(location.coords);
+      const loc = await Location.getCurrentPositionAsync({});
+      setUserLocation(loc.coords);
       mapRef.current?.animateToRegion({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
+        latitude: loc.coords.latitude,
+        longitude: loc.coords.longitude,
         latitudeDelta: 0.05,
         longitudeDelta: 0.05,
       });
     })();
   }, []);
 
-  // Search by address/place name using device geocoder (no API key)
+  // ✅ Fetch map markers from Firestore
+  useEffect(() => {
+    const fetchPins = async () => {
+      try {
+        const predictionsRef = collection(db, "predictions");
+        let q;
+
+        if (userRole === "admin") {
+          q = query(predictionsRef);
+        } else {
+          // Only fully verified pins visible to public users
+          q = query(
+            predictionsRef,
+            where("verified_label", "==", true),
+            where("verified_location", "==", true)
+          );
+        }
+
+        const snapshot = await getDocs(q);
+        const list = snapshot.docs
+          .filter((d) => d.data().lat && d.data().lng) // only entries with coordinates
+          .map((d) => ({
+            id: d.id,
+            title: d.data().corrected_label || d.data().predicted_label || "Unknown Species",
+            verified_label: d.data().verified_label,
+            verified_location: d.data().verified_location,
+            lat: d.data().lat,
+            lng: d.data().lng,
+            coordinate: { latitude: d.data().lat, longitude: d.data().lng },
+            userId: d.data().userId,
+          }));
+
+        setMarkers(list);
+      } catch (err) {
+        console.error("❌ Error loading pins:", err);
+      } finally {
+        setLoadingPins(false);
+      }
+    };
+
+    fetchPins();
+  }, [userRole]);
+
+  // 🔍 Local search
   const handleSearch = async () => {
-    const trimmed = query.trim();
-    if (!trimmed) {
-      Alert.alert("Search", "Please enter a place or address.");
-      return;
-    }
+    const trimmed = queryText.trim();
+    if (!trimmed) return Alert.alert("Search", "Enter a location name.");
     try {
       setSearching(true);
-      // Example: "Kuching", "Semenggoh", "Kubah National Park"
       const results = await Location.geocodeAsync(trimmed);
-      if (!results || results.length === 0) {
-        Alert.alert("Not found", "Could not find that location.");
-        return;
-      }
+      if (results.length === 0) return Alert.alert("Not found", "Try another name.");
       const { latitude, longitude } = results[0];
       mapRef.current?.animateToRegion({
         latitude,
@@ -77,31 +117,15 @@ export default function MapScreen({ navigation }) {
       });
     } catch (e) {
       console.error("Geocode error:", e);
-      Alert.alert("Error", "Failed to look up that location.");
+      Alert.alert("Error", "Failed to find that location.");
     } finally {
       setSearching(false);
     }
   };
 
-  // Add mock marker on long press
-  const handleAddMarker = (event) => {
-    const newCoordinate = event.nativeEvent.coordinate;
-    const newMarker = {
-      id: Date.now(),
-      title: "New Plant Sighting",
-      description: "User-added observation",
-      coordinate: newCoordinate,
-    };
-    setMarkers((prev) => [...prev, newMarker]);
-    Alert.alert("📍 New Sighting", "Added new plant location successfully!");
-  };
-
-  // Center to user's current location
+  // 🎯 Center to user
   const handleCenterToUser = () => {
-    if (!userLocation) {
-      Alert.alert("Location not available", "Try again once GPS is ready.");
-      return;
-    }
+    if (!userLocation) return;
     mapRef.current?.animateToRegion({
       latitude: userLocation.latitude,
       longitude: userLocation.longitude,
@@ -110,25 +134,32 @@ export default function MapScreen({ navigation }) {
     });
   };
 
+  // 🎨 Marker color logic
+  const getMarkerColor = (m) => {
+    if (m.verified_label && m.verified_location) return "green";
+    if (m.verified_label && !m.verified_location) return "orange";
+    return "red";
+  };
+
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Plant Map</Text>
         <TouchableOpacity style={styles.iconButton}>
-          <Ionicons name="options-outline" size={22} color="#112112" />
+          <Ionicons name="leaf-outline" size={22} color="#15931b" />
         </TouchableOpacity>
       </View>
 
-      {/* 🔎 Simple Search Bar (no Google key needed) */}
+      {/* Search bar */}
       <View style={styles.searchBarWrap}>
         <View style={styles.searchBar}>
           <Ionicons name="search" size={18} color="#666" style={{ marginRight: 8 }} />
           <TextInput
-            placeholder="Search for a location (e.g., Kuching, Semenggoh)"
+            placeholder="Search location (e.g. Semenggoh)"
             placeholderTextColor="#888"
-            value={query}
-            onChangeText={setQuery}
+            value={queryText}
+            onChangeText={setQueryText}
             returnKeyType="search"
             onSubmitEditing={handleSearch}
             style={styles.searchInput}
@@ -143,7 +174,7 @@ export default function MapScreen({ navigation }) {
         </View>
       </View>
 
-      {/* Map Section */}
+      {/* Map */}
       <MapView
         ref={mapRef}
         style={styles.map}
@@ -154,34 +185,49 @@ export default function MapScreen({ navigation }) {
           latitudeDelta: 0.4,
           longitudeDelta: 0.4,
         }}
-        onLongPress={handleAddMarker}
       >
-        {markers.map((marker) => (
-          <Marker
-            key={marker.id}
-            coordinate={marker.coordinate}
-            title={marker.title}
-            description={marker.description}
-            pinColor="red"
-          >
-            <Callout
-              onPress={() =>
-                navigation.navigate("ObservationDetails", {
-                  observation: marker,
-                })
+        {!loadingPins &&
+          markers.map((m) => (
+            <Marker
+              key={m.id}
+              coordinate={m.coordinate}
+              title={m.title}
+              description={
+                userRole === "admin"
+                  ? `Label: ${m.verified_label ? "✅" : "❌"} | Location: ${
+                      m.verified_location ? "✅" : "❌"
+                    }`
+                  : undefined
               }
+              pinColor={getMarkerColor(m)}
             >
-              <View style={styles.calloutContainer}>
-                <Text style={styles.calloutTitle}>{marker.title}</Text>
-                <Text style={styles.calloutDescription}>{marker.description}</Text>
-                <Text style={styles.calloutLink}>View Details →</Text>
-              </View>
-            </Callout>
-          </Marker>
-        ))}
+              <Callout
+                onPress={() =>
+                  navigation.navigate("ObservationDetails", {
+                    observation: m,
+                  })
+                }
+              >
+                <View style={styles.calloutContainer}>
+                  <Text style={styles.calloutTitle}>{m.title}</Text>
+                  {userRole === "admin" && (
+                    <>
+                      <Text style={styles.calloutDescription}>
+                        Label verified: {m.verified_label ? "Yes" : "No"}
+                      </Text>
+                      <Text style={styles.calloutDescription}>
+                        Location verified: {m.verified_location ? "Yes" : "No"}
+                      </Text>
+                    </>
+                  )}
+                  <Text style={styles.calloutLink}>View Details →</Text>
+                </View>
+              </Callout>
+            </Marker>
+          ))}
       </MapView>
 
-      {/* 🎯 Center to My Location Button */}
+      {/* Center to My Location */}
       <TouchableOpacity style={styles.centerButton} onPress={handleCenterToUser}>
         <Ionicons name="locate-outline" size={26} color="#fff" />
       </TouchableOpacity>
@@ -189,7 +235,7 @@ export default function MapScreen({ navigation }) {
       {/* ➕ Add Observation Button */}
       <TouchableOpacity
         style={styles.addButton}
-        onPress={() => Alert.alert("Coming Soon", "Add new observation form")}
+        onPress={() => navigation.navigate("SelectPredictionForLocation")}
       >
         <Ionicons name="add" size={28} color="#fff" />
       </TouchableOpacity>
@@ -197,12 +243,8 @@ export default function MapScreen({ navigation }) {
   );
 }
 
-// 💅 Styles
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f6f8f6",
-  },
+  container: { flex: 1, backgroundColor: "#f6f8f6" },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -214,15 +256,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#e1e5e2",
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#15931b",
-  },
+  headerTitle: { fontSize: 20, fontWeight: "700", color: "#15931b" },
   iconButton: { padding: 6 },
   map: { flex: 1 },
-
-  // Search bar
   searchBarWrap: {
     position: "absolute",
     top: Platform.OS === "ios" ? 110 : 100,
@@ -240,11 +276,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     height: 46,
   },
-  searchInput: {
-    flex: 1,
-    color: "#112112",
-    fontSize: 15,
-  },
+  searchInput: { flex: 1, color: "#112112", fontSize: 15 },
   goBtn: {
     backgroundColor: "#15931b",
     paddingHorizontal: 10,
@@ -252,14 +284,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginLeft: 8,
   },
-
-  // Callout
   calloutContainer: { width: 180 },
   calloutTitle: { fontWeight: "700", fontSize: 14, color: "#112112" },
   calloutDescription: { fontSize: 12, color: "#5c6c5e" },
   calloutLink: { marginTop: 4, color: "#15931b", fontWeight: "600", fontSize: 12 },
-
-  // Floating buttons
   addButton: {
     position: "absolute",
     bottom: 30,

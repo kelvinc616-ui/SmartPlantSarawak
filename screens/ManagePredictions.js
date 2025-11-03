@@ -109,12 +109,12 @@ const saveEdit = async () => {
     const docRef = doc(db, "predictions", editingPrediction.id);
     await updateDoc(docRef, {
       predicted_label: newLabel,
-      verified: editingPrediction.verified || false,
+      verified_label: editingPrediction.verified_label || false,
     });
 
     const updated = predictions.map((p) =>
       p.id === editingPrediction.id
-        ? { ...p, predicted_label: newLabel, verified: editingPrediction.verified }
+        ? { ...p, predicted_label: newLabel, verified_label: editingPrediction.verified_label }
         : p
     );
 
@@ -184,7 +184,7 @@ const saveEdit = async () => {
             <View style={styles.info}>
               <Text style={styles.label}>
                 {item.predicted_label}{" "}
-                {item.verified && <Text style={styles.verified}>✔ Verified</Text>}
+                {item.verified_label && <Text style={styles.verified_label}>✔ Verified</Text>}
               </Text>
               <Text style={styles.confidence}>
                 Confidence: {item.confidence?.toFixed(2)}%
@@ -244,14 +244,14 @@ const saveEdit = async () => {
         onPress={() =>
           setEditingPrediction((prev) => ({
             ...prev,
-            verified: !prev.verified,
+            verified_label: !prev.verified_label,
           }))
         }
       >
         <Ionicons
-          name={editingPrediction?.verified ? "checkbox-outline" : "square-outline"}
+          name={editingPrediction?.verified_label ? "checkbox-outline" : "square-outline"}
           size={22}
-          color={editingPrediction?.verified ? "#2E7D32" : "#666"}
+          color={editingPrediction?.verified_label ? "#2E7D32" : "#666"}
         />
         <Text style={styles.verifyText}>Mark as Verified</Text>
       </TouchableOpacity>
@@ -326,7 +326,7 @@ const styles = StyleSheet.create({
   image: { width: "100%", height: 180, borderRadius: 10, marginBottom: 10 },
   info: { marginBottom: 8 },
   label: { fontSize: 16, fontWeight: "600", color: "#1a1a1a" },
-  verified: { color: "#2E7D32", fontWeight: "700" },
+  verified_label: { color: "#2E7D32", fontWeight: "700" },
   confidence: { fontSize: 13, color: "#2E7D32" },
   timestamp: { fontSize: 12, color: "#666", marginTop: 3 },
   model: { fontSize: 12, color: "#888" },

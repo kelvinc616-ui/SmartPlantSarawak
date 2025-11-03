@@ -60,8 +60,8 @@ export default function MyObservations({ navigation }) {
       ? new Date(item.timestamp.seconds * 1000).toLocaleString()
       : "Unknown";
 
-    const statusColor = item.verified ? "#2E7D32" : "#D32F2F";
-    const statusLabel = item.verified ? "Verified" : "Pending";
+    const statusColor = item.verified_label ? "#2E7D32" : "#D32F2F";
+    const statusLabel = item.verified_label ? "Verified" : "Pending";
 
     return (
       <TouchableOpacity
@@ -93,7 +93,7 @@ export default function MyObservations({ navigation }) {
             style={[styles.statusBadge, { backgroundColor: statusColor + "20" }]}
           >
             <Ionicons
-              name={item.verified ? "checkmark-circle-outline" : "time-outline"}
+              name={item.verified_label ? "checkmark-circle-outline" : "time-outline"}
               size={16}
               color={statusColor}
               style={{ marginRight: 4 }}

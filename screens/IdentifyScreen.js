@@ -10,23 +10,20 @@ import {
   ScrollView,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-// import * as FileSystem from "expo-file-system";
 import * as FileSystem from "expo-file-system/legacy";
-import { FileSystemUploadType } from "expo-file-system"; 
+import { FileSystemUploadType } from "expo-file-system";
 import { Ionicons } from "@expo/vector-icons";
-import { auth, db, storage } from "../firebaseConfig";
+import { auth, db } from "../firebaseConfig";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 export default function IdentifyScreen({ navigation }) {
   const [selectedImage, setSelectedImage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
 
-  // Capture from camera
+  // 📸 Capture from camera
   const handleTakePhoto = async () => {
     try {
-      console.log("Opening camera...");
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== "granted") {
         Alert.alert("Permission Denied", "Camera access is required.");
@@ -39,7 +36,6 @@ export default function IdentifyScreen({ navigation }) {
         quality: 1,
       });
 
-      console.log("Camera result:", result);
       if (!result.canceled) {
         setSelectedImage(result.assets[0].uri);
         setResult(null);
@@ -50,10 +46,9 @@ export default function IdentifyScreen({ navigation }) {
     }
   };
 
-  // Upload from gallery
+  // 🖼 Upload from gallery
   const handleUploadImage = async () => {
     try {
-      console.log("Opening gallery...");
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
         Alert.alert("Permission Denied", "Gallery access is required.");
@@ -66,7 +61,6 @@ export default function IdentifyScreen({ navigation }) {
         quality: 1,
       });
 
-      console.log("Gallery result:", result);
       if (!result.canceled) {
         setSelectedImage(result.assets[0].uri);
         setResult(null);
@@ -77,109 +71,109 @@ export default function IdentifyScreen({ navigation }) {
     }
   };
 
-  // Identify Button — Upload → Predict → Save to Firestore
+  // 🌿 Identify Button — Upload → Predict → Save → Offer to Share Location
   const handleIdentify = async () => {
-  if (!selectedImage) {
-    Alert.alert("No Image Selected", "Please upload or capture a photo first.");
-    return;
-  }
-
-  setLoading(true);
-  try {
-    // 🔹 1. Get current user
-    const user = auth.currentUser;
-    const fileName = `${user?.uid || "guest"}_${Date.now()}.jpg`;
-    const BUCKET_NAME = "smartplantsarawak-f13b9.firebasestorage.app";
-    const uploadUrl = `https://firebasestorage.googleapis.com/v0/b/${BUCKET_NAME}/o/predictions%2F${encodeURIComponent(
-      fileName
-    )}?uploadType=media`;
-
-
-    console.log("Uploading image via fetch:", uploadUrl);
-
-    // 🔹 2. Upload image directly using fetch()
-    const img = await fetch(selectedImage);
-    const blob = await img.blob();
-
-    const uploadResponse = await fetch(uploadUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "image/jpeg",
-      },
-      body: blob,
-    });
-
-    if (!uploadResponse.ok) {
-      throw new Error(`Upload failed with status ${uploadResponse.status}`);
+    if (!selectedImage) {
+      Alert.alert("No Image Selected", "Please upload or capture a photo first.");
+      return;
     }
 
-    // 🔹 3. Build a public download URL
-    const imageURL = `https://firebasestorage.googleapis.com/v0/b/${BUCKET_NAME}/o/predictions%2F${encodeURIComponent(
-      fileName
-    )}?alt=media`;
-    console.log("✅ Uploaded image:", imageURL);
+    setLoading(true);
+    try {
+      const user = auth.currentUser;
+      const fileName = `${user?.uid || "guest"}_${Date.now()}.jpg`;
+      const BUCKET_NAME = "smartplantsarawak-f13b9.firebasestorage.app";
+      const uploadUrl = `https://firebasestorage.googleapis.com/v0/b/${BUCKET_NAME}/o/predictions%2F${encodeURIComponent(
+        fileName
+      )}?uploadType=media`;
 
-    // 🔹 4. Send URL to your Flask AI API
-    const aiResponse = await fetch(
-      "https://smartplant-ai-615502932033.asia-southeast1.run.app/predict",
-      {
+      console.log("Uploading image:", uploadUrl);
+
+      // Upload image directly to Firebase Storage using fetch
+      const img = await fetch(selectedImage);
+      const blob = await img.blob();
+
+      const uploadResponse = await fetch(uploadUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ image_url: imageURL }),
+        headers: { "Content-Type": "image/jpeg" },
+        body: blob,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error(`Upload failed with status ${uploadResponse.status}`);
       }
-    );
 
-    if (!aiResponse.ok) {
-      throw new Error(`Prediction failed: HTTP ${aiResponse.status}`);
+      const imageURL = `https://firebasestorage.googleapis.com/v0/b/${BUCKET_NAME}/o/predictions%2F${encodeURIComponent(
+        fileName
+      )}?alt=media`;
+      console.log("✅ Uploaded image URL:", imageURL);
+
+      // 🔍 Send URL to Flask AI model
+      const aiResponse = await fetch(
+        "https://smartplant-ai-615502932033.asia-southeast1.run.app/predict",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image_url: imageURL }),
+        }
+      );
+
+      if (!aiResponse.ok) throw new Error(`Prediction failed: HTTP ${aiResponse.status}`);
+
+      const prediction = await aiResponse.json();
+      console.log("Prediction:", prediction);
+
+      // 💾 Save prediction result to Firestore
+      const docRef = await addDoc(collection(db, "predictions"), {
+        userId: user?.uid || "guest",
+        imageUrl: imageURL,
+        predicted_label: prediction.predicted_label,
+        confidence: prediction.confidence,
+        top_predictions: prediction.top_predictions || [],
+        model_version: prediction.model_version,
+        timestamp: serverTimestamp(),
+        verified_label: false,
+        verified_location: false,
+        location_shared: false,
+      });
+
+      console.log("✅ Prediction saved with ID:", docRef.id);
+
+      // 🎯 Show result + ask to share location
+      Alert.alert(
+        "Prediction Result",
+        `${prediction.predicted_label} (${prediction.confidence}%)`,
+        [
+          {
+            text: "Share Location",
+            onPress: () =>
+              navigation.navigate("AddLocation", {
+                predictionId: docRef.id,
+                predicted_label: prediction.predicted_label,
+              }),
+          },
+          { text: "Done", style: "cancel" },
+        ]
+      );
+
+      setResult(prediction);
+    } catch (error) {
+      console.error("Error:", error);
+      Alert.alert("Error", "Failed to upload or identify. Please try again.");
+    } finally {
+      setLoading(false);
     }
-
-    const prediction = await aiResponse.json();
-    console.log("Prediction received:", prediction);
-
-    // 🔹 5. Save to Firestore
-    await addDoc(collection(db, "predictions"), {
-      userId: user?.uid || "guest",
-      imageUrl: imageURL,
-      predicted_label: prediction.predicted_label,
-      confidence: prediction.confidence,
-      top_predictions: prediction.top_predictions || [],
-      model_version: prediction.model_version,
-      timestamp: serverTimestamp(),
-      verified: false,
-    });
-
-    // 🔹 6. Show result
-    Alert.alert(
-      "Prediction Result",
-      `${prediction.predicted_label} (${prediction.confidence}%)`
-    );
-    setResult(prediction);
-  } catch (error) {
-    console.error("Error:", error);
-    Alert.alert("Error", "Failed to upload or identify. Please try again.");
-  } finally {
-    setLoading(false);
-  }
   };
-
-
-
 
   return (
     <View style={styles.container}>
-      {/* ✅ Make the entire content scrollable */}
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 40 }}
       >
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={styles.backButton}
-          >
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color="#112112" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Identify</Text>
@@ -187,10 +181,10 @@ export default function IdentifyScreen({ navigation }) {
         </View>
 
         <Text style={styles.subtitle}>
-          Capture or upload a photo of the plant to identify it
+          Capture or upload a photo of the plant to identify it.
         </Text>
 
-        {/* Image preview */}
+        {/* Image Preview */}
         <TouchableOpacity
           style={styles.imageContainer}
           activeOpacity={0.8}
@@ -205,9 +199,7 @@ export default function IdentifyScreen({ navigation }) {
           ) : (
             <View style={styles.placeholderContainer}>
               <Ionicons name="cloud-upload-outline" size={60} color="#15931b" />
-              <Text style={styles.placeholderText}>
-                Tap to upload or take a photo
-              </Text>
+              <Text style={styles.placeholderText}>Tap to upload or take a photo</Text>
             </View>
           )}
         </TouchableOpacity>
@@ -227,9 +219,7 @@ export default function IdentifyScreen({ navigation }) {
             onPress={handleUploadImage}
           >
             <Ionicons name="image" size={20} color="#15931b" />
-            <Text style={styles.secondaryButtonText}>
-              Upload from Gallery
-            </Text>
+            <Text style={styles.secondaryButtonText}>Upload from Gallery</Text>
           </TouchableOpacity>
         </View>
 
@@ -255,12 +245,8 @@ export default function IdentifyScreen({ navigation }) {
         {/* Prediction Result */}
         {result && (
           <View style={styles.resultBox}>
-            <Text style={styles.resultText}>
-              🌿 Species: {result.predicted_label}
-            </Text>
-            <Text style={styles.resultText}>
-              📊 Confidence: {result.confidence}%
-            </Text>
+            <Text style={styles.resultText}>🌿 Species: {result.predicted_label}</Text>
+            <Text style={styles.resultText}>📊 Confidence: {result.confidence}%</Text>
             {result.top_predictions?.length > 1 && (
               <View>
                 <Text style={styles.resultText}>Top 3 Predictions:</Text>

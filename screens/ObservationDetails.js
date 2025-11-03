@@ -23,7 +23,7 @@ export default function ObservationDetails({ route }) {
     predicted_label,
     confidence,
     top_predictions,
-    verified,
+    verified_label,
     timestamp,
     model_version,
   } = obs;
@@ -63,7 +63,7 @@ export default function ObservationDetails({ route }) {
         </Text>
         <Text style={styles.info}>
           Status:{" "}
-          {verified ? (
+          {verified_label ? (
             <Text style={{ color: "#2E7D32", fontWeight: "700" }}>
               ✅ Verified
             </Text>
