@@ -86,9 +86,7 @@ export default function LoginScreen({ navigation }) {
       <View style={styles.card}>
         {/* 🌿 Header Image */}
         <Image
-          source={{
-            uri: "https://lh3.googleusercontent.com/aida-public/AB6AXuA1d9xszeE3ZENEvgyeJW8FqzLqCnb3HnQnilj6tQYG_cYz6Y5M6sxjU37ptb66WqYdod_nfoqF4bYB__LvT0102wrzs9HQ9HPOQnwuTo-NjMPv-9c5npu9mhhD0iF4cGN_jCplk0mIZyYbgy4chowe55UMODx4l2gL9bAvTHNZFXsvXwaDw0htkK6XjGpSfe9655gMoN09D19-ij9UMugIlsmwDzBJogu7y8epMDD63AXVm7tzpHpIfV18lZohzf5TEaK7CmwPv70",
-          }}
+          source={require("../assets/Login_headerImage.jpg")}
           style={styles.headerImage}
         />
 
