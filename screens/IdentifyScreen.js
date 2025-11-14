@@ -10,8 +10,6 @@ import {
   ScrollView,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system/legacy";
-import { FileSystemUploadType } from "expo-file-system";
 import { Ionicons } from "@expo/vector-icons";
 import { auth, db } from "../firebaseConfig";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
@@ -71,7 +69,7 @@ export default function IdentifyScreen({ navigation }) {
     }
   };
 
-  // 🌿 Identify Button — Upload → Predict → Save → Offer to Share Location
+  // 🌿 Identify Button → Upload → Predict → Ask User to Accept or Flag Unsure
   const handleIdentify = async () => {
     if (!selectedImage) {
       Alert.alert("No Image Selected", "Please upload or capture a photo first.");
@@ -89,7 +87,6 @@ export default function IdentifyScreen({ navigation }) {
 
       console.log("Uploading image:", uploadUrl);
 
-      // Upload image directly to Firebase Storage using fetch
       const img = await fetch(selectedImage);
       const blob = await img.blob();
 
@@ -108,7 +105,7 @@ export default function IdentifyScreen({ navigation }) {
       )}?alt=media`;
       console.log("✅ Uploaded image URL:", imageURL);
 
-      // 🔍 Send URL to Flask AI model
+      // 🔍 AI Prediction API
       const aiResponse = await fetch(
         "https://smartplant-ai-615502932033.asia-southeast1.run.app/predict",
         {
@@ -118,48 +115,71 @@ export default function IdentifyScreen({ navigation }) {
         }
       );
 
-      if (!aiResponse.ok) throw new Error(`Prediction failed: HTTP ${aiResponse.status}`);
+      if (!aiResponse.ok)
+        throw new Error(`Prediction failed: HTTP ${aiResponse.status}`);
 
       const prediction = await aiResponse.json();
       console.log("Prediction:", prediction);
 
-      // 💾 Save prediction result to Firestore
-      const docRef = await addDoc(collection(db, "predictions"), {
-        userId: user?.uid || "guest",
-        imageUrl: imageURL,
-        predicted_label: prediction.predicted_label,
-        confidence: prediction.confidence,
-        top_predictions: prediction.top_predictions || [],
-        model_version: prediction.model_version,
-        timestamp: serverTimestamp(),
-        verified_label: false,
-        verified_location: false,
-        share_location: false,
-      });
+      setResult(prediction);
 
-      console.log("✅ Prediction saved with ID:", docRef.id);
-
-      // 🎯 Show result + ask to share location
+      // 🎯 Ask user whether they trust the result
       Alert.alert(
-        "Prediction Result",
+        "AI Prediction",
         `${prediction.predicted_label} (${prediction.confidence}%)`,
         [
           {
-            text: "Share Location",
-            onPress: () =>
+            text: "Accept Result",
+            onPress: async () => {
+              const docRef = await addDoc(collection(db, "predictions"), {
+                userId: user?.uid || "guest",
+                imageUrl: imageURL,
+                predicted_label: prediction.predicted_label,
+                confidence: prediction.confidence,
+                top_predictions: prediction.top_predictions || [],
+                model_version: prediction.model_version,
+                timestamp: serverTimestamp(),
+                flagged_unsure: false, // ✔ user accepted
+                verified_label: false,
+                verified_location: false,
+                share_location: false,
+              });
+
               navigation.navigate("AddLocation", {
                 predictionId: docRef.id,
                 predicted_label: prediction.predicted_label,
-              }),
+              });
+            },
           },
-          { text: "Done", style: "cancel" },
+
+          {
+            text: "Flag as Unsure",
+            style: "destructive",
+            onPress: async () => {
+              await addDoc(collection(db, "predictions"), {
+                userId: user?.uid || "guest",
+                imageUrl: imageURL,
+                predicted_label: prediction.predicted_label,
+                confidence: prediction.confidence,
+                top_predictions: prediction.top_predictions || [],
+                model_version: prediction.model_version,
+                timestamp: serverTimestamp(),
+                flagged_unsure: true, // ✔ marked for admin
+                verified_label: false,
+                verified_location: false,
+                share_location: false,
+              });
+
+              Alert.alert("Submitted for Review", "An admin will verify this prediction.");
+            },
+          },
+
+          { text: "Cancel", style: "cancel" },
         ]
       );
-
-      setResult(prediction);
     } catch (error) {
       console.error("Error:", error);
-      Alert.alert("Error", "Failed to upload or identify. Please try again.");
+      Alert.alert("Error", "Failed to identify the plant. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -167,10 +187,7 @@ export default function IdentifyScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 40 }}
-      >
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -204,7 +221,7 @@ export default function IdentifyScreen({ navigation }) {
           )}
         </TouchableOpacity>
 
-        {/* Buttons */}
+        {/* Take Photo + Upload Buttons */}
         <View style={styles.buttonsContainer}>
           <TouchableOpacity
             style={[styles.button, styles.primaryButton]}
@@ -242,11 +259,12 @@ export default function IdentifyScreen({ navigation }) {
           )}
         </TouchableOpacity>
 
-        {/* Prediction Result */}
+        {/* Prediction Result (Optional Display) */}
         {result && (
           <View style={styles.resultBox}>
             <Text style={styles.resultText}>🌿 Species: {result.predicted_label}</Text>
             <Text style={styles.resultText}>📊 Confidence: {result.confidence}%</Text>
+
             {result.top_predictions?.length > 1 && (
               <View>
                 <Text style={styles.resultText}>Top 3 Predictions:</Text>
@@ -264,6 +282,7 @@ export default function IdentifyScreen({ navigation }) {
   );
 }
 
+// 🎨 Styles (unchanged)
 const styles = StyleSheet.create({
   container: {
     flex: 1,

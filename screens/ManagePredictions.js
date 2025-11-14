@@ -20,6 +20,8 @@ import {
   deleteDoc,
   doc,
   updateDoc,
+  query,
+  where,
 } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 
@@ -31,21 +33,29 @@ export default function ManagePredictions() {
   const [sortOrder, setSortOrder] = useState("desc");
   const [editingPrediction, setEditingPrediction] = useState(null);
   const [newLabel, setNewLabel] = useState("");
-  const [showMap, setShowMap] = useState(false); // 🗺️ Map preview modal
+  const [showMap, setShowMap] = useState(false);
 
+  // 🔥 Fetch ONLY predictions flagged as unsure
   const fetchPredictions = async () => {
     try {
-      const snapshot = await getDocs(collection(db, "predictions"));
+      const q = query(
+        collection(db, "predictions"),
+        where("flagged_unsure", "==", true)
+      );
+
+      const snapshot = await getDocs(q);
+
       const list = snapshot.docs.map((docSnap) => {
-      const data = docSnap.data();
-      const coords = data.location || {};
-      return {
-        id: docSnap.id,
-        ...data,
-        lat: coords.latitude,
-        lng: coords.longitude,
-      };
-    });
+        const data = docSnap.data();
+        const coords = data.location || {};
+        return {
+          id: docSnap.id,
+          ...data,
+          lat: coords.latitude,
+          lng: coords.longitude,
+        };
+      });
+
       setPredictions(list);
       setFiltered(list);
     } catch (error) {
@@ -65,9 +75,11 @@ export default function ManagePredictions() {
         onPress: async () => {
           try {
             await deleteDoc(doc(db, "predictions", id));
+
             const updated = predictions.filter((p) => p.id !== id);
             setPredictions(updated);
             setFiltered(updated);
+
             Alert.alert("Deleted", "Prediction removed successfully.");
           } catch (error) {
             console.error("Error deleting:", error);
@@ -111,41 +123,40 @@ export default function ManagePredictions() {
     setNewLabel(item.predicted_label);
   };
 
+  // 🔥 Save verified label/location + CLEAR flagged_unsure
   const saveEdit = async () => {
     if (!editingPrediction) return;
+
     try {
       const docRef = doc(db, "predictions", editingPrediction.id);
+
       await updateDoc(docRef, {
         predicted_label: newLabel,
         verified_label: editingPrediction.verified_label || false,
         verified_location: editingPrediction.verified_location || false,
-        // 🔒 Default share_location = false whenever location verified
+
+        // 🔥 CRITICAL:
+        // Admin has reviewed → Not unsure anymore
+        flagged_unsure: false,
+
         share_location:
           editingPrediction.verified_location === true
             ? false
             : editingPrediction.share_location || false,
       });
 
-      const updated = predictions.map((p) =>
-        p.id === editingPrediction.id
-          ? {
-              ...p,
-              predicted_label: newLabel,
-              verified_label: editingPrediction.verified_label,
-              verified_location: editingPrediction.verified_location,
-              share_location:
-                editingPrediction.verified_location === true ? false : editingPrediction.share_location,
-            }
-          : p
-      );
+      // ❗ Remove from admin list instantly
+      const updated = predictions.filter((p) => p.id !== editingPrediction.id);
 
       setPredictions(updated);
       setFiltered(updated);
+
       setEditingPrediction(null);
       setNewLabel("");
-      Alert.alert("Updated", "Prediction updated successfully.");
+
+      Alert.alert("Updated", "Prediction verified and updated.");
     } catch (error) {
-      console.error("Error updating prediction:", error);
+      console.error("Error updating:", error);
       Alert.alert("Error", "Failed to update prediction.");
     }
   };
@@ -165,7 +176,7 @@ export default function ManagePredictions() {
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>🌱 Manage Predictions</Text>
+      <Text style={styles.title}>🌱 Manage Flagged Predictions</Text>
 
       {/* Search & Sort Controls */}
       <View style={styles.controls}>
@@ -194,26 +205,34 @@ export default function ManagePredictions() {
 
       {filtered.length === 0 ? (
         <View style={styles.noResults}>
-          <Text style={{ color: "#555", marginTop: 10 }}>No predictions found.</Text>
+          <Text style={{ color: "#555", marginTop: 10 }}>
+            No flagged predictions to review 🎉  
+          </Text>
         </View>
       ) : (
         filtered.map((item) => (
           <View key={item.id} style={styles.card}>
             <Image source={{ uri: item.imageUrl }} style={styles.image} />
+
             <View style={styles.info}>
               <Text style={styles.label}>
                 {item.predicted_label}{" "}
-                {item.verified_label && <Text style={styles.verified_label}>✔ Label</Text>}
+                {item.verified_label && (
+                  <Text style={styles.verified_label}>✔ Label</Text>
+                )}
                 {item.verified_location && (
                   <Text style={styles.verified_location}> 🌍 Location</Text>
                 )}
               </Text>
+
               <Text style={styles.confidence}>
                 Confidence: {item.confidence?.toFixed(2)}%
               </Text>
+
               <Text style={styles.timestamp}>
                 📅 {item.timestamp?.toDate?.().toLocaleString?.() || item.timestamp}
               </Text>
+
               <Text style={styles.model}>Model: {item.model_version}</Text>
               <Text style={styles.userId}>User ID: {item.userId}</Text>
             </View>
@@ -241,7 +260,7 @@ export default function ManagePredictions() {
       <Modal visible={!!editingPrediction} transparent animationType="slide">
         <View style={styles.modalContainer}>
           <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>Edit Prediction</Text>
+            <Text style={styles.modalTitle}>Edit & Verify</Text>
             <TextInput
               style={styles.modalInput}
               value={newLabel}
@@ -250,7 +269,7 @@ export default function ManagePredictions() {
               placeholderTextColor="#999"
             />
 
-            {/* ✅ Verify Label Checkbox */}
+            {/* Verify Label */}
             <TouchableOpacity
               style={styles.verifyRow}
               onPress={() =>
@@ -261,14 +280,18 @@ export default function ManagePredictions() {
               }
             >
               <Ionicons
-                name={editingPrediction?.verified_label ? "checkbox-outline" : "square-outline"}
+                name={
+                  editingPrediction?.verified_label
+                    ? "checkbox-outline"
+                    : "square-outline"
+                }
                 size={22}
                 color={editingPrediction?.verified_label ? "#2E7D32" : "#666"}
               />
               <Text style={styles.verifyText}>Mark Label as Verified</Text>
             </TouchableOpacity>
 
-            {/* 🌍 Verify Location Checkbox */}
+            {/* Verify Location */}
             <TouchableOpacity
               style={styles.verifyRow}
               onPress={() =>
@@ -279,21 +302,27 @@ export default function ManagePredictions() {
               }
             >
               <Ionicons
-                name={editingPrediction?.verified_location ? "checkbox-outline" : "square-outline"}
+                name={
+                  editingPrediction?.verified_location
+                    ? "checkbox-outline"
+                    : "square-outline"
+                }
                 size={22}
                 color={editingPrediction?.verified_location ? "#2E7D32" : "#666"}
               />
               <Text style={styles.verifyText}>Mark Location as Verified</Text>
             </TouchableOpacity>
 
-            {/* 🗺️ View Location */}
+            {/* View Location */}
             {editingPrediction?.lat && editingPrediction?.lng ? (
               <TouchableOpacity
                 style={[styles.verifyRow, { justifyContent: "center", marginBottom: 10 }]}
                 onPress={() => setShowMap(true)}
               >
                 <Ionicons name="map-outline" size={22} color="#00796B" />
-                <Text style={[styles.verifyText, { marginLeft: 6 }]}>View Location</Text>
+                <Text style={[styles.verifyText, { marginLeft: 6 }]}>
+                  View Location
+                </Text>
               </TouchableOpacity>
             ) : (
               <Text
@@ -323,7 +352,7 @@ export default function ManagePredictions() {
         </View>
       </Modal>
 
-      {/* 🗺️ Map Preview Modal */}
+      {/* Map Preview Modal */}
       <Modal visible={showMap} transparent animationType="slide">
         <View style={styles.modalContainer}>
           <View style={styles.mapBox}>
