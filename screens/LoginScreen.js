@@ -1,5 +1,13 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet, Image } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Alert,
+  StyleSheet,
+  Image,
+} from "react-native";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "../firebaseConfig";
 import { doc, getDoc } from "firebase/firestore";
@@ -15,53 +23,79 @@ export default function LoginScreen({ navigation }) {
     return emailRegex.test(email);
   };
 
+  // ✅ Optional stronger password rule (letters + numbers)
+  const isStrongPassword = (password) => {
+    const strongRegex = /^(?=.*[A-Za-z])(?=.*\d).+$/;
+    return strongRegex.test(password);
+  };
+
   // 🔐 Handle login
   const handleLogin = async () => {
-    // 1️⃣ Check for empty fields
-    if (!email || !password) {
+    const trimmedEmail = email.trim();
+    const trimmedPassword = password.trim();
+
+    // 1️⃣ Check empty fields
+    if (!trimmedEmail || !trimmedPassword) {
       Alert.alert("Missing Fields", "Please enter both email and password.");
       return;
     }
 
-    // 2️⃣ Validate email format
-    if (!isValidEmail(email)) {
-      Alert.alert("Invalid Email", "Please enter a valid email address (e.g., example@gmail.com).");
+    // 2️⃣ No spaces in email
+    if (trimmedEmail.includes(" ")) {
+      Alert.alert("Invalid Email", "Email cannot contain spaces.");
       return;
     }
 
-    // 3️⃣ Validate password length
-    if (password.length < 6) {
+    // 3️⃣ Validate email format
+    if (!isValidEmail(trimmedEmail)) {
+      Alert.alert("Invalid Email", "Please enter a valid email address.");
+      return;
+    }
+
+    // 4️⃣ Validate password length
+    if (trimmedPassword.length < 6) {
       Alert.alert("Weak Password", "Password must be at least 6 characters long.");
       return;
     }
 
+    // 5️⃣ Optional stronger password rule
+    if (!isStrongPassword(trimmedPassword)) {
+      Alert.alert(
+        "Weak Password",
+        "Password should contain at least 1 letter and 1 number."
+      );
+      return;
+    }
+
     setLoading(true);
+
     try {
-      // 4️⃣ Sign in user with Firebase Auth
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      // Firebase login
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        trimmedEmail,
+        trimmedPassword
+      );
+
       const user = userCredential.user;
 
-      // 5️⃣ Fetch Firestore profile document
+      // Fetch Firestore role
       const docRef = doc(db, "users", user.uid);
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
         const userData = docSnap.data();
-        console.log("✅ Logged in as:", userData);
 
-        // 6️⃣ Role-based navigation
+        // Role-based navigation
         if (userData.role === "admin") {
           navigation.replace("AdminDashboard");
         } else {
           navigation.replace("Main");
         }
       } else {
-        Alert.alert("Error", "User profile not found in Firestore.");
+        Alert.alert("Error", "User profile not found.");
       }
     } catch (error) {
-      console.error("❌ Login failed:", error.message);
-
-      // 7️⃣ Friendlier Firebase error handling
       switch (error.code) {
         case "auth/invalid-email":
           Alert.alert("Login failed", "Invalid email format.");
@@ -70,7 +104,7 @@ export default function LoginScreen({ navigation }) {
           Alert.alert("Login failed", "No user found with this email.");
           break;
         case "auth/wrong-password":
-          Alert.alert("Login failed", "Incorrect password. Please try again.");
+          Alert.alert("Login failed", "Incorrect password.");
           break;
         default:
           Alert.alert("Login failed", error.message);
@@ -84,13 +118,11 @@ export default function LoginScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <View style={styles.card}>
-        {/* 🌿 Header Image */}
         <Image
           source={require("../assets/Login_headerImage.jpg")}
           style={styles.headerImage}
         />
 
-        {/* 👋 Welcome Text */}
         <Text style={styles.title}>Welcome Back</Text>
         <Text style={styles.subtitle}>
           Log in to continue your journey in protecting Sarawak’s biodiversity.
@@ -116,8 +148,14 @@ export default function LoginScreen({ navigation }) {
         />
 
         {/* 🔘 Login Button */}
-        <TouchableOpacity onPress={handleLogin} style={styles.loginButton} disabled={loading}>
-          <Text style={styles.loginText}>{loading ? "Logging in..." : "Login"}</Text>
+        <TouchableOpacity
+          onPress={handleLogin}
+          style={styles.loginButton}
+          disabled={loading}
+        >
+          <Text style={styles.loginText}>
+            {loading ? "Logging in..." : "Login"}
+          </Text>
         </TouchableOpacity>
 
         {/* 🆕 Register Link */}
@@ -132,7 +170,7 @@ export default function LoginScreen({ navigation }) {
   );
 }
 
-// 💅 Styles
+/* 💅 Styles */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -148,9 +186,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 20,
     padding: 20,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
     elevation: 5,
   },
   headerImage: {
