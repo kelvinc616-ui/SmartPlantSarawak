@@ -1,4 +1,3 @@
-// screens/ManagePredictions.js
 import React, { useEffect, useState } from "react";
 import {
   View,
@@ -13,6 +12,7 @@ import {
   Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";   // ⭐ ADDED
 import MapView, { Marker } from "react-native-maps";
 import {
   collection,
@@ -23,7 +23,9 @@ import {
   query,
   where,
 } from "firebase/firestore";
-import { db } from "../firebaseConfig";
+
+import { db, storage } from "../firebaseConfig";  
+import { ref, uploadBytes, deleteObject, getDownloadURL } from "firebase/storage"; // ⭐ ADDED
 
 export default function ManagePredictions() {
   const [predictions, setPredictions] = useState([]);
@@ -34,6 +36,8 @@ export default function ManagePredictions() {
   const [editingPrediction, setEditingPrediction] = useState(null);
   const [newLabel, setNewLabel] = useState("");
   const [showMap, setShowMap] = useState(false);
+
+  const [newVerifiedImage, setNewVerifiedImage] = useState(null); // ⭐ ADDED
 
   // 🔥 Fetch ONLY predictions flagged as unsure
   const fetchPredictions = async () => {
@@ -95,11 +99,11 @@ export default function ManagePredictions() {
     if (text.trim() === "") {
       setFiltered(predictions);
     } else {
-      const query = text.toLowerCase();
+      const queryLower = text.toLowerCase();
       const results = predictions.filter(
         (p) =>
-          p.predicted_label?.toLowerCase().includes(query) ||
-          p.userId?.toLowerCase().includes(query)
+          p.predicted_label?.toLowerCase().includes(queryLower) ||
+          p.userId?.toLowerCase().includes(queryLower)
       );
       setFiltered(results);
     }
@@ -121,40 +125,89 @@ export default function ManagePredictions() {
   const startEditing = (item) => {
     setEditingPrediction(item);
     setNewLabel(item.predicted_label);
+    setNewVerifiedImage(null); // ⭐ reset
   };
 
-  // 🔥 Save verified label/location + CLEAR flagged_unsure
+  // ⭐ Pick verified image
+  const pickVerifiedImage = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert("Permission Required", "Allow gallery access to upload image.");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: "images",
+      quality: 1,
+    });
+
+    if (!result.canceled) {
+      setNewVerifiedImage(result.assets[0].uri);
+    }
+  };
+
+  // ⭐ Upload new image + delete old one
+  const uploadVerifiedImage = async (oldUrl, predictionId) => {
+    if (!newVerifiedImage) return oldUrl; // nothing changed
+
+    try {
+      const filename = `verified_${predictionId}_${Date.now()}.jpg`;
+      const storageRef = ref(storage, `predictions/${filename}`);
+
+      // upload new file
+      const img = await fetch(newVerifiedImage);
+      const blob = await img.blob();
+      await uploadBytes(storageRef, blob);
+
+      const downloadURL = await getDownloadURL(storageRef);
+
+      // delete OLD image
+      try {
+        const oldRef = ref(storage, decodeURIComponent(oldUrl.split("/o/")[1].split("?")[0]));
+        await deleteObject(oldRef);
+      } catch (err) {
+        console.warn("Old image delete failed (ignored):", err);
+      }
+
+      return downloadURL;
+    } catch (err) {
+      console.error("Image upload failed:", err);
+      Alert.alert("Error", "Failed to upload verified image.");
+      return oldUrl;
+    }
+  };
+
+  // 🔥 Save verified label/location + NEW verified image
   const saveEdit = async () => {
     if (!editingPrediction) return;
 
     try {
       const docRef = doc(db, "predictions", editingPrediction.id);
 
+      // ⭐ Upload image if selected
+      const updatedImageUrl = await uploadVerifiedImage(
+        editingPrediction.imageUrl,
+        editingPrediction.id
+      );
+
       await updateDoc(docRef, {
         predicted_label: newLabel,
         verified_label: editingPrediction.verified_label || false,
         verified_location: editingPrediction.verified_location || false,
-
-        // 🔥 CRITICAL:
-        // Admin has reviewed → Not unsure anymore
         flagged_unsure: false,
-
-        share_location:
-          editingPrediction.verified_location === true
-            ? false
-            : editingPrediction.share_location || false,
+        imageUrl: updatedImageUrl, // ⭐ replace original image
       });
 
-      // ❗ Remove from admin list instantly
+      // Remove from admin list
       const updated = predictions.filter((p) => p.id !== editingPrediction.id);
-
       setPredictions(updated);
       setFiltered(updated);
 
       setEditingPrediction(null);
       setNewLabel("");
+      setNewVerifiedImage(null);
 
-      Alert.alert("Updated", "Prediction verified and updated.");
+      Alert.alert("Updated", "Prediction verified successfully.");
     } catch (error) {
       console.error("Error updating:", error);
       Alert.alert("Error", "Failed to update prediction.");
@@ -203,11 +256,10 @@ export default function ManagePredictions() {
         </TouchableOpacity>
       </View>
 
+      {/* Prediction Cards */}
       {filtered.length === 0 ? (
         <View style={styles.noResults}>
-          <Text style={{ color: "#555", marginTop: 10 }}>
-            No flagged predictions to review 🎉  
-          </Text>
+          <Text style={{ color: "#555", marginTop: 10 }}>No flagged predictions 🎉</Text>
         </View>
       ) : (
         filtered.map((item) => (
@@ -217,12 +269,7 @@ export default function ManagePredictions() {
             <View style={styles.info}>
               <Text style={styles.label}>
                 {item.predicted_label}{" "}
-                {item.verified_label && (
-                  <Text style={styles.verified_label}>✔ Label</Text>
-                )}
-                {item.verified_location && (
-                  <Text style={styles.verified_location}> 🌍 Location</Text>
-                )}
+                {item.verified_label && <Text style={styles.verified_label}>✔ Verified</Text>}
               </Text>
 
               <Text style={styles.confidence}>
@@ -261,15 +308,30 @@ export default function ManagePredictions() {
         <View style={styles.modalContainer}>
           <View style={styles.modalBox}>
             <Text style={styles.modalTitle}>Edit & Verify</Text>
+
+            {/* Label Input */}
             <TextInput
               style={styles.modalInput}
               value={newLabel}
               onChangeText={setNewLabel}
-              placeholder="Enter new label"
+              placeholder="Enter corrected label"
               placeholderTextColor="#999"
             />
 
-            {/* Verify Label */}
+            {/* ⭐ PICK Verified Image */}
+            <TouchableOpacity style={styles.uploadBtn} onPress={pickVerifiedImage}>
+              <Ionicons name="image-outline" size={22} color="#2E7D32" />
+              <Text style={styles.uploadText}>Upload Verified Image</Text>
+            </TouchableOpacity>
+
+            {newVerifiedImage && (
+              <Image
+                source={{ uri: newVerifiedImage }}
+                style={{ width: "100%", height: 160, borderRadius: 10, marginBottom: 10 }}
+              />
+            )}
+
+            {/* Checkboxes */}
             <TouchableOpacity
               style={styles.verifyRow}
               onPress={() =>
@@ -291,7 +353,6 @@ export default function ManagePredictions() {
               <Text style={styles.verifyText}>Mark Label as Verified</Text>
             </TouchableOpacity>
 
-            {/* Verify Location */}
             <TouchableOpacity
               style={styles.verifyRow}
               onPress={() =>
@@ -313,37 +374,17 @@ export default function ManagePredictions() {
               <Text style={styles.verifyText}>Mark Location as Verified</Text>
             </TouchableOpacity>
 
-            {/* View Location */}
-            {editingPrediction?.lat && editingPrediction?.lng ? (
-              <TouchableOpacity
-                style={[styles.verifyRow, { justifyContent: "center", marginBottom: 10 }]}
-                onPress={() => setShowMap(true)}
-              >
-                <Ionicons name="map-outline" size={22} color="#00796B" />
-                <Text style={[styles.verifyText, { marginLeft: 6 }]}>
-                  View Location
-                </Text>
-              </TouchableOpacity>
-            ) : (
-              <Text
-                style={{
-                  color: "#999",
-                  fontSize: 13,
-                  textAlign: "center",
-                  marginBottom: 10,
-                }}
-              >
-                No location data available
-              </Text>
-            )}
-
+            {/* Save */}
             <View style={styles.modalButtons}>
               <TouchableOpacity style={styles.saveButton} onPress={saveEdit}>
                 <Text style={styles.saveText}>Save</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.cancelButton}
-                onPress={() => setEditingPrediction(null)}
+                onPress={() => {
+                  setEditingPrediction(null);
+                  setNewVerifiedImage(null);
+                }}
               >
                 <Text style={styles.cancelText}>Cancel</Text>
               </TouchableOpacity>
@@ -402,6 +443,20 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 30,
     marginBottom: 20,
+  },
+    uploadBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+    backgroundColor: "#eaf7ea",
+    padding: 10,
+    borderRadius: 8,
+  },
+  uploadText: {
+    marginLeft: 8,
+    fontSize: 15,
+    color: "#2E7D32",
+    fontWeight: "600",
   },
   controls: {
     flexDirection: "row",
