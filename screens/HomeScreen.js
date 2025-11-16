@@ -24,26 +24,41 @@ export default function HomeScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
 
   // ✅ Fetch the latest verified predictions
-  useEffect(() => {
-    async function fetchVerifiedPredictions() {
-      try {
-        const q = query(
-          collection(db, "predictions"),
-          where("verified_label", "==", true),
-          orderBy("timestamp", "desc"),
-          limit(5)
-        );
-        const snap = await getDocs(q);
-        const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        setRecentPredictions(list);
-      } catch (e) {
-        console.error("Error fetching predictions:", e);
-      } finally {
-        setLoading(false);
-      }
+useEffect(() => {
+  // Runs automatically when the screen is loaded
+  async function fetchVerifiedPredictions() {
+    try {
+      // Create a query to get only verified predictions (verified_label == true)
+      // Sort them by timestamp (most recent first)
+      // Limit results to the latest 5 records
+      const q = query(
+        collection(db, "predictions"),
+        where("verified_label", "==", true),
+        orderBy("timestamp", "desc"),
+        limit(5)
+      );
+
+      // Execute the query and get the documents from Firestore
+      const snap = await getDocs(q);
+
+      // Convert the Firestore documents into a simple list of objects
+      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+      // Update the state with the latest verified predictions
+      setRecentPredictions(list);
+    } catch (e) {
+      // Handle any errors that happen during data fetching
+      console.error("Error fetching predictions:", e);
+    } finally {
+      // Stop showing the loading indicator once data is loaded or an error occurs
+      setLoading(false);
     }
-    fetchVerifiedPredictions();
-  }, []);
+  }
+
+  // Call the function when the component mounts
+  fetchVerifiedPredictions();
+}, []);
+
 
   return (
     <View style={styles.container}>
