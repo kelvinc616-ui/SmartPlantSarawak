@@ -41,6 +41,18 @@ export default function AdminDashboard({ navigation }) {
           <Text style={styles.cardDesc}>Check prediction usage and performance metrics.</Text>
         </View>
       </TouchableOpacity>
+
+            {/* IoT Card */}
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => navigation.navigate("IoTMonitoring")}
+      >
+        <Ionicons name="hardware-chip-outline" size={26} color="#2E7D32" />
+        <View style={{ marginLeft: 10 }}>
+          <Text style={styles.cardTitle}>IoT Sensor Data</Text>
+          <Text style={styles.cardDesc}>View real-time environmental sensor readings.</Text>
+        </View>
+      </TouchableOpacity>
     </ScrollView>
   );
 }

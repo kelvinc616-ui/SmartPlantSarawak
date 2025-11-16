@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: "700",
-    color: "#15931b",
+    color: "#145a32",
   },
   profileCard: {
     backgroundColor: "#fff",
@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
 
  
   observationButton: {
-    backgroundColor: "#15931b",
+    backgroundColor: "#145a32",
     shadowColor: "#000",
     shadowOpacity: 0.1,
     shadowRadius: 3,

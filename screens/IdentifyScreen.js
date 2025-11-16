@@ -320,7 +320,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 30,
   },
-  primaryButton: { backgroundColor: "#15931b" },
+  primaryButton: { backgroundColor: "#145a32" },
   primaryButtonText: { color: "#fff", fontWeight: "700", marginLeft: 8 },
   secondaryButton: { backgroundColor: "rgba(21,147,27,0.1)" },
   secondaryButtonText: { color: "#15931b", fontWeight: "700", marginLeft: 8 },
@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 16,
     borderRadius: 30,
-    backgroundColor: "#15931b",
+    backgroundColor: "#145a32",
     marginTop: 10,
   },
   identifyButtonText: {
