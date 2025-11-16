@@ -41,6 +41,19 @@ export default function AdminDashboard({ navigation }) {
           <Text style={styles.cardDesc}>Check prediction usage and performance metrics.</Text>
         </View>
       </TouchableOpacity>
+
+      {/* ⭐ NEW: IoT Dashboard */}
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => navigation.navigate("IoTDashboard")}
+      >
+        <Ionicons name="hardware-chip-outline" size={26} color="#2E7D32" />
+        <View style={{ marginLeft: 10 }}>
+          <Text style={styles.cardTitle}>IoT Dashboard</Text>
+          <Text style={styles.cardDesc}>Monitor ESP32 sensor data in real time.</Text>
+        </View>
+      </TouchableOpacity>
+
     </ScrollView>
   );
 }

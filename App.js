@@ -25,6 +25,8 @@ import AddLocationScreen from "./screens/AddLocationScreen";
 import UserMain from "./navigation/UserMain";
 import AdminMain from "./navigation/AdminMain";
 
+import IoTDashboard from "./screens/IoTDashboard";
+
 // Stack Navigator
 const Stack = createNativeStackNavigator();
 
@@ -109,6 +111,9 @@ export default function App() {
           name="AddLocation" 
           component={AddLocationScreen} 
         />
+
+        <Stack.Screen name="IoTDashboard" component={IoTDashboard} />
+
 
       </Stack.Navigator>
     </NavigationContainer>
