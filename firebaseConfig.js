@@ -10,7 +10,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyCmeBhVhI8IsgHT-4vbhNaPuaIpalLSVck",
   authDomain: "smartplantsarawak-f13b9.firebaseapp.com",
   projectId: "smartplantsarawak-f13b9",
-  storageBucket: "smartplantsarawak-f13b9.appspot.com", // ✅ fixed here
+  storageBucket: "smartplantsarawak-f13b9.appspot.com",
   messagingSenderId: "615502932033",
   appId: "1:615502932033:web:f27f14361319e5e103bec0",
 };

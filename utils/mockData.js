@@ -19,3 +19,5 @@ export const mockObservations = [
     status: "Flagged",
   },
 ];
+
+//remember to delete this once we replace the featured plants section

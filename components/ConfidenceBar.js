@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 
+
 export default function ConfidenceBar({ confidence }) {
   const percent = Math.round(confidence * 100);
   return (

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -6,10 +6,45 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
+  ActivityIndicator,
 } from "react-native";
+import {
+  collection,
+  getDocs,
+  query,
+  where,
+  orderBy,
+  limit,
+} from "firebase/firestore";
+import { db } from "../firebaseConfig";
 import { mockObservations } from "../utils/mockData";
 
 export default function HomeScreen({ navigation }) {
+  const [recentPredictions, setRecentPredictions] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // ✅ Fetch the latest verified predictions
+  useEffect(() => {
+    async function fetchVerifiedPredictions() {
+      try {
+        const q = query(
+          collection(db, "predictions"),
+          where("verified_label", "==", true),
+          orderBy("timestamp", "desc"),
+          limit(5)
+        );
+        const snap = await getDocs(q);
+        const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setRecentPredictions(list);
+      } catch (e) {
+        console.error("Error fetching predictions:", e);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchVerifiedPredictions();
+  }, []);
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -41,40 +76,58 @@ export default function HomeScreen({ navigation }) {
           </View>
         </View>
 
-        {/* Recent Observations */}
+        {/* 🪴 Recent Observations */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Recent Observations</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.horizontalScroll}
-          >
-            {Array.isArray(mockObservations) &&
-              mockObservations.map((item) => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={styles.card}
-                  onPress={() => {
-                    const parentNav = navigation.getParent?.() ?? navigation;
-                    parentNav.navigate("ObservationDetails", { observation: item });
-                    console.log("➡️ navigating with:", item);
-                  }}
-                >
-                  {item.image && (
-                    <Image
-                      source={item.image}
-                      style={styles.cardImage}
-                      resizeMode="cover"
-                    />
-                  )}
-                  <Text style={styles.cardText}>{item.species}</Text>
-                  <Text style={styles.cardSubText}>{item.location}</Text>
-                </TouchableOpacity>
-              ))}
-          </ScrollView>
+
+          {loading ? (
+            <ActivityIndicator size="small" color="#15931b" />
+          ) : (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalScroll}
+            >
+              {recentPredictions.length === 0 ? (
+                <Text style={{ color: "#777" }}>
+                  No recent predictions yet.
+                </Text>
+              ) : (
+                recentPredictions.map((item) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={styles.card}
+                    onPress={() =>
+                      navigation.navigate("ObservationDetails", {
+                        observation: item,
+                      })
+                    }
+                  >
+                    {item.imageUrl && (
+                      <Image
+                        source={{ uri: item.imageUrl }}
+                        style={styles.cardImage}
+                        resizeMode="cover"
+                      />
+                    )}
+                    <Text style={styles.cardText}>
+                      {item.predicted_label || "Unknown"}
+                    </Text>
+                    <Text style={styles.cardSubText}>
+                      Confidence:{" "}
+                      {typeof item.confidence === "number"
+                        ? item.confidence.toFixed(2)
+                        : "—"}
+                      %
+                    </Text>
+                  </TouchableOpacity>
+                ))
+              )}
+            </ScrollView>
+          )}
         </View>
 
-        {/* Featured Plants (optional placeholder) */}
+        {/* 🌿 Featured Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Featured Plants</Text>
           <ScrollView
@@ -86,7 +139,7 @@ export default function HomeScreen({ navigation }) {
               <View key={plant.id} style={styles.card}>
                 {plant.image && (
                   <Image
-                    source={plant.image}   // 
+                    source={plant.image}
                     style={styles.cardImage}
                     resizeMode="cover"
                   />
@@ -96,7 +149,6 @@ export default function HomeScreen({ navigation }) {
             ))}
           </ScrollView>
         </View>
-
       </ScrollView>
     </View>
   );
@@ -148,14 +200,12 @@ const styles = StyleSheet.create({
   actionSecondaryText: { color: "#15931b", fontWeight: "700" },
   horizontalScroll: { paddingHorizontal: 12 },
   card: { width: 160, marginRight: 12 },
-
   cardImage: {
-  width: "100%",
-  height: 150,
-  borderRadius: 12,
-  backgroundColor: "#e0e0e0", 
+    width: "100%",
+    height: 150,
+    borderRadius: 12,
+    backgroundColor: "#e0e0e0",
   },
-
   cardText: {
     marginTop: 6,
     fontSize: 14,

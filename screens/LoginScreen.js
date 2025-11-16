@@ -6,9 +6,15 @@ import {
   TouchableOpacity,
   Alert,
   StyleSheet,
+  ImageBackground,
   Image,
+  StatusBar,
 } from "react-native";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import {
+  signInWithEmailAndPassword,
+  sendEmailVerification,
+  signOut,
+} from "firebase/auth";
 import { auth, db } from "../firebaseConfig";
 import { doc, getDoc } from "firebase/firestore";
 
@@ -17,222 +23,182 @@ export default function LoginScreen({ navigation }) {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // ✅ Basic email format validation
-  const isValidEmail = (email) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
-
-  // ✅ Optional stronger password rule (letters + numbers)
-  const isStrongPassword = (password) => {
-    const strongRegex = /^(?=.*[A-Za-z])(?=.*\d).+$/;
-    return strongRegex.test(password);
-  };
-
-  // 🔐 Handle login
   const handleLogin = async () => {
-    const trimmedEmail = email.trim();
-    const trimmedPassword = password.trim();
-
-    // 1️⃣ Check empty fields
-    if (!trimmedEmail || !trimmedPassword) {
-      Alert.alert("Missing Fields", "Please enter both email and password.");
-      return;
-    }
-
-    // 2️⃣ No spaces in email
-    if (trimmedEmail.includes(" ")) {
-      Alert.alert("Invalid Email", "Email cannot contain spaces.");
-      return;
-    }
-
-    // 3️⃣ Validate email format
-    if (!isValidEmail(trimmedEmail)) {
-      Alert.alert("Invalid Email", "Please enter a valid email address.");
-      return;
-    }
-
-    // 4️⃣ Validate password length
-    if (trimmedPassword.length < 6) {
-      Alert.alert("Weak Password", "Password must be at least 6 characters long.");
-      return;
-    }
-
-    // 5️⃣ Optional stronger password rule
-    if (!isStrongPassword(trimmedPassword)) {
-      Alert.alert(
-        "Weak Password",
-        "Password should contain at least 1 letter and 1 number."
-      );
+    if (!email || !password) {
+      Alert.alert("Missing fields", "Please enter both email and password.");
       return;
     }
 
     setLoading(true);
-
     try {
-      // Firebase login
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        trimmedEmail,
-        trimmedPassword
-      );
-
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // Fetch Firestore role
-      const docRef = doc(db, "users", user.uid);
-      const docSnap = await getDoc(docRef);
+      if (!user.emailVerified) {
+        await signOut(auth);
+        Alert.alert(
+          "Email Not Verified",
+          "Please verify your email before logging in.",
+          [
+            {
+              text: "Resend Verification Link",
+              onPress: async () => {
+                try {
+                  await sendEmailVerification(user);
+                  Alert.alert("Verification Sent", "Check your inbox.");
+                } catch (error) {
+                  console.error(error);
+                  Alert.alert("Error", "Could not resend verification email.");
+                }
+              },
+            },
+            { text: "OK", style: "cancel" },
+          ]
+        );
+        return;
+      }
 
+      const docSnap = await getDoc(doc(db, "users", user.uid));
       if (docSnap.exists()) {
         const userData = docSnap.data();
-
-        // Role-based navigation
         if (userData.role === "admin") {
-          navigation.replace("AdminDashboard");
+          navigation.replace("AdminMain");
+        } else if (userData.role === "public") {
+          navigation.replace("UserMain");
         } else {
-          navigation.replace("Main");
+          Alert.alert("Error", "Unknown role assigned.");
         }
       } else {
-        Alert.alert("Error", "User profile not found.");
+        Alert.alert("Error", "User profile not found in Firestore.");
       }
     } catch (error) {
-      switch (error.code) {
-        case "auth/invalid-email":
-          Alert.alert("Login failed", "Invalid email format.");
-          break;
-        case "auth/user-not-found":
-          Alert.alert("Login failed", "No user found with this email.");
-          break;
-        case "auth/wrong-password":
-          Alert.alert("Login failed", "Incorrect password.");
-          break;
-        default:
-          Alert.alert("Login failed", error.message);
-          break;
-      }
+      console.error("Login failed:", error.message);
+      Alert.alert("Login failed", error.message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.card}>
-        <Image
-          source={require("../assets/Login_headerImage.jpg")}
-          style={styles.headerImage}
-        />
+    <ImageBackground
+      source={
+        require("../assets/images/loginpagebg2.jpg")
+      }
+      style={styles.background}
+      resizeMode="cover"
+    >
+      <StatusBar barStyle="light-content" />
+      <View style={styles.overlay} />
 
+      <View style={styles.container}>
         <Text style={styles.title}>Welcome Back</Text>
         <Text style={styles.subtitle}>
-          Log in to continue your journey in protecting Sarawak’s biodiversity.
+          Continue your journey in protecting Sarawak’s biodiversity.
         </Text>
 
-        {/* 📧 Email Input */}
+        {/* Input Fields */}
         <TextInput
-          placeholder="Email Address"
           style={styles.input}
+          placeholder="Email Address"
+          placeholderTextColor="#D9F3E2"
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
-          keyboardType="email-address"
         />
-
-        {/* 🔒 Password Input */}
         <TextInput
-          placeholder="Password"
           style={styles.input}
+          placeholder="Password"
+          placeholderTextColor="#D9F3E2"
           value={password}
           onChangeText={setPassword}
           secureTextEntry
         />
 
-        {/* 🔘 Login Button */}
+        {/* Login Button */}
         <TouchableOpacity
           onPress={handleLogin}
-          style={styles.loginButton}
+          style={[styles.button, loading && { opacity: 0.8 }]}
           disabled={loading}
         >
-          <Text style={styles.loginText}>
-            {loading ? "Logging in..." : "Login"}
+          <Text style={styles.buttonText}>
+            {loading ? "Logging in..." : "LOGIN"}
           </Text>
         </TouchableOpacity>
 
-        {/* 🆕 Register Link */}
+        {/* Register Link */}
         <TouchableOpacity onPress={() => navigation.navigate("Register")}>
           <Text style={styles.signupText}>
             Don’t have an account?{" "}
-            <Text style={{ color: "#2E7D32", fontWeight: "700" }}>Sign up</Text>
+            <Text style={{ color: "#C8FACC", fontWeight: "700" }}>Sign up</Text>
           </Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </ImageBackground>
   );
 }
 
-/* 💅 Styles */
 const styles = StyleSheet.create({
-  container: {
+  background: {
     flex: 1,
-    backgroundColor: "#F7F8FA",
-    alignItems: "center",
     justifyContent: "center",
-    padding: 20,
-  },
-  card: {
-    width: "100%",
-    maxWidth: 400,
     alignItems: "center",
-    backgroundColor: "#fff",
-    borderRadius: 20,
-    padding: 20,
-    elevation: 5,
   },
-  headerImage: {
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.35)",
+  },
+  container: {
     width: "100%",
-    height: 160,
-    borderRadius: 12,
-    marginBottom: 16,
+    maxWidth: 380,
+    alignItems: "center",
+    padding: 24,
+    paddingTop: 75,
   },
   title: {
-    fontSize: 26,
-    fontWeight: "700",
-    color: "#1A202C",
-    textAlign: "center",
+  fontSize: 30,
+  color: "#E6F8EC",
+  fontWeight: "700",
+  marginBottom: 6,
   },
   subtitle: {
-    fontSize: 14,
-    color: "#4B5563",
-    textAlign: "center",
-    marginVertical: 10,
+  color: "#C8FACC",
+  fontSize: 15,
+  textAlign: "center",
+  marginBottom: 28,
+  paddingHorizontal: 12,
+  opacity: 0.9,
   },
   input: {
     width: "100%",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#D1D5DB",
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 12,
+    backgroundColor: "rgba(255, 255, 255, 0.12)",
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    color: "#fff",
     fontSize: 16,
-    color: "#1A202C",
-    marginVertical: 8,
+    marginBottom: 14,
   },
-  loginButton: {
-    backgroundColor: "#2E7D32",
-    borderRadius: 10,
+  button: {
+    width: "100%",
+    backgroundColor: "#5BA87D",
+    borderRadius: 12,
     paddingVertical: 14,
     alignItems: "center",
-    width: "100%",
     marginTop: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 10,
   },
-  loginText: {
-    color: "#fff",
+  buttonText: {
+    color: "#F2FFF7",
     fontWeight: "700",
     fontSize: 16,
   },
   signupText: {
     fontSize: 14,
-    color: "#4B5563",
-    marginTop: 16,
+    color: "#D9F3E2",
+    marginTop: 18,
   },
 });

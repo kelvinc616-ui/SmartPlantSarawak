@@ -1,0 +1,18 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environments
+.venv/
+env/
+venv/
+
+# Node or frontend files
+node_modules/
+*.log
+
+# Local system files
+.DS_Store
+.idea/
+.vscode/
