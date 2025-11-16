@@ -9,7 +9,7 @@ import {
   TextInput,
   ActivityIndicator,
 } from "react-native";
-import MapView, { Marker, Callout, PROVIDER_GOOGLE } from "react-native-maps";
+import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import { auth, db } from "../firebaseConfig";
@@ -22,9 +22,12 @@ export default function MapScreen({ navigation }) {
   const [queryText, setQueryText] = useState("");
   const [searching, setSearching] = useState(false);
   const [loadingPins, setLoadingPins] = useState(true);
-  const [userRole, setUserRole] = useState("user"); // default role
+  const [userRole, setUserRole] = useState("user");
+  const [selectedMarker, setSelectedMarker] = useState(null);
 
-  // Fetch current user role
+  /** ------------------------------
+   * Fetch current user role
+   * ------------------------------ */
   useEffect(() => {
     const fetchRole = async () => {
       const user = auth.currentUser;
@@ -36,16 +39,20 @@ export default function MapScreen({ navigation }) {
     fetchRole();
   }, []);
 
-  // Get user's current location
+  /** ------------------------------
+   * Get user current location
+   * ------------------------------ */
   useEffect(() => {
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert("Permission denied", "Location access is required.");
+        Alert.alert("Permission Denied", "Location access is required.");
         return;
       }
+
       const loc = await Location.getCurrentPositionAsync({});
       setUserLocation(loc.coords);
+
       mapRef.current?.animateToRegion({
         latitude: loc.coords.latitude,
         longitude: loc.coords.longitude,
@@ -55,12 +62,15 @@ export default function MapScreen({ navigation }) {
     })();
   }, []);
 
-  // Fetch map markers (based on role)
+  /** ------------------------------
+   * Fetch predictions (pins)
+   * ------------------------------ */
   useEffect(() => {
     const fetchPins = async () => {
       try {
         const predictionsRef = collection(db, "predictions");
         let q;
+
         if (userRole === "admin") {
           q = query(predictionsRef);
         } else {
@@ -73,23 +83,25 @@ export default function MapScreen({ navigation }) {
         }
 
         const snapshot = await getDocs(q);
+
         const list = snapshot.docs
           .map((d) => {
             const data = d.data();
             const loc = data.location || {};
-            const lat = loc.latitude;
-            const lng = loc.longitude;
             return {
               id: d.id,
               title: data.corrected_label || data.predicted_label || "Unknown Species",
-              imageUrl: data.imageUrl || null,
-              confidence: data.confidence || null,
-              timestamp: data.timestamp || null,
+              imageUrl: data.imageUrl,
+              confidence: data.confidence,
+              timestamp: data.timestamp,
               model_version: data.model_version || "v1",
               address: data.address || "Unknown Location",
-              lat,
-              lng,
-              coordinate: lat && lng ? { latitude: lat, longitude: lng } : null,
+              lat: loc.latitude,
+              lng: loc.longitude,
+              coordinate:
+                loc.latitude && loc.longitude
+                  ? { latitude: loc.latitude, longitude: loc.longitude }
+                  : null,
               verified_label: data.verified_label,
               verified_location: data.verified_location,
               share_location: data.share_location,
@@ -109,15 +121,21 @@ export default function MapScreen({ navigation }) {
     fetchPins();
   }, [userRole]);
 
-  // Search for a place by name
+  /** ------------------------------
+   * Search Location
+   * ------------------------------ */
   const handleSearch = async () => {
     const trimmed = queryText.trim();
     if (!trimmed) return Alert.alert("Search", "Enter a location name.");
+
     try {
       setSearching(true);
       const results = await Location.geocodeAsync(trimmed);
+
       if (results.length === 0) return Alert.alert("Not found", "Try another name.");
+
       const { latitude, longitude } = results[0];
+
       mapRef.current?.animateToRegion({
         latitude,
         longitude,
@@ -132,7 +150,9 @@ export default function MapScreen({ navigation }) {
     }
   };
 
-  // Center map to user's location
+  /** ------------------------------
+   * Center on user
+   * ------------------------------ */
   const handleCenterToUser = () => {
     if (!userLocation) return;
     mapRef.current?.animateToRegion({
@@ -143,13 +163,18 @@ export default function MapScreen({ navigation }) {
     });
   };
 
-  // Marker color logic
+  /** ------------------------------
+   * Marker Color
+   * ------------------------------ */
   const getMarkerColor = (m) => {
     if (m.verified_label && m.verified_location) return "green";
     if (m.verified_label && !m.verified_location) return "orange";
     return "red";
   };
 
+  /** ------------------------------
+   * UI
+   * ------------------------------ */
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -183,7 +208,7 @@ export default function MapScreen({ navigation }) {
         </View>
       </View>
 
-      {/* Map View */}
+      {/* MAP */}
       <MapView
         ref={mapRef}
         style={styles.map}
@@ -201,42 +226,14 @@ export default function MapScreen({ navigation }) {
               key={m.id}
               coordinate={m.coordinate}
               title={m.title}
-              description={
-                userRole === "admin"
-                  ? `Label: ${m.verified_label ? "✅" : "❌"} | Location: ${
-                      m.verified_location ? "✅" : "❌"
-                    }`
-                  : undefined
-              }
               pinColor={getMarkerColor(m)}
-              // helps Android render the callout above the map surface
               tracksViewChanges={false}
-              calloutAnchor={{ x: 0.5, y: 0 }} // lift the bubble above the pin head
-            >
-              {/* DEFAULT, NON-TOOLTIP CALLOUT (most reliable on Android) */}
-              <Callout
-                onPress={() => navigation.navigate("ObservationDetails", { observation: m })}
-              >
-                <View style={styles.defaultCallout}>
-                  <Text style={styles.calloutTitle}>{m.title}</Text>
-                  {userRole === "admin" && (
-                    <>
-                      <Text style={styles.calloutRow}>
-                        Label Verified: {m.verified_label ? "Yes" : "No"}
-                      </Text>
-                      <Text style={styles.calloutRow}>
-                        Location Verified: {m.verified_location ? "Yes" : "No"}
-                      </Text>
-                    </>
-                  )}
-                  <Text style={styles.calloutLink}>Tap for details →</Text>
-                </View>
-              </Callout>
-            </Marker>
+              onPress={() => setSelectedMarker(m)}
+            />
           ))}
       </MapView>
 
-      {/* Center to User Button */}
+      {/* Center to User */}
       <TouchableOpacity style={styles.centerButton} onPress={handleCenterToUser}>
         <Ionicons name="locate-outline" size={26} color="#fff" />
       </TouchableOpacity>
@@ -248,12 +245,51 @@ export default function MapScreen({ navigation }) {
       >
         <Ionicons name="add" size={28} color="#fff" />
       </TouchableOpacity>
+
+      {/* BOTTOM SHEET CARD */}
+      {selectedMarker && (
+        <View style={styles.bottomCard}>
+          <TouchableOpacity
+            style={styles.cardClose}
+            onPress={() => setSelectedMarker(null)}
+          >
+            <Ionicons name="close" size={22} color="#333" />
+          </TouchableOpacity>
+
+          <Text style={styles.cardTitle}>{selectedMarker.title}</Text>
+
+          {userRole === "admin" && (
+            <>
+              <Text style={styles.cardText}>
+                Label Verified: {selectedMarker.verified_label ? "Yes" : "No"}
+              </Text>
+              <Text style={styles.cardText}>
+                Location Verified: {selectedMarker.verified_location ? "Yes" : "No"}
+              </Text>
+            </>
+          )}
+
+          <TouchableOpacity
+            style={styles.cardButton}
+            onPress={() => {
+              navigation.navigate("ObservationDetails", { observation: selectedMarker });
+              setSelectedMarker(null);
+            }}
+          >
+            <Text style={styles.cardButtonText}>View Details</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
 
+/** ------------------------------
+ * Styles
+ * ------------------------------ */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f6f8f6" },
+
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -261,12 +297,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 50,
     paddingBottom: 10,
-    backgroundColor: "#f6f8f6",
     borderBottomWidth: 1,
     borderBottomColor: "#e1e5e2",
   },
   headerTitle: { fontSize: 20, fontWeight: "700", color: "#15931b" },
-  iconButton: { padding: 6 },
+
   map: { flex: 1 },
 
   searchBarWrap: {
@@ -274,7 +309,7 @@ const styles = StyleSheet.create({
     top: Platform.OS === "ios" ? 110 : 100,
     width: "90%",
     alignSelf: "center",
-    zIndex: 1,
+    zIndex: 2,
   },
   searchBar: {
     flexDirection: "row",
@@ -295,31 +330,6 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
 
-  // callout
-  defaultCallout: {
-    width: 190,
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    padding: 10,
-    borderColor: "rgba(0,0,0,0.15)",
-    borderWidth: 1,
-  },
-  calloutTitle: {
-    fontWeight: "700",
-    fontSize: 14,
-    color: "#15931b",
-    marginBottom: 4,
-    textAlign: "center",
-  },
-  calloutRow: { fontSize: 12, color: "#333" },
-  calloutLink: {
-    marginTop: 6,
-    color: "#15931b",
-    fontWeight: "600",
-    fontSize: 12,
-    textAlign: "center",
-  },
-
   addButton: {
     position: "absolute",
     bottom: 30,
@@ -331,7 +341,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     elevation: 5,
+    zIndex: 2,
   },
+
   centerButton: {
     position: "absolute",
     bottom: 100,
@@ -343,5 +355,54 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     elevation: 4,
+    zIndex: 2,
+  },
+
+  /** Bottom Card */
+  bottomCard: {
+    position: "absolute",
+    bottom: 20,
+    left: 20,
+    right: 20,
+    backgroundColor: "#fff",
+    padding: 16,
+    borderRadius: 16,
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 8,
+    zIndex: 3,
+  },
+  cardTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#15931b",
+    textAlign: "center",
+    marginBottom: 6,
+  },
+  cardText: {
+    fontSize: 14,
+    color: "#444",
+    textAlign: "center",
+    marginVertical: 2,
+  },
+  cardButton: {
+    backgroundColor: "#15931b",
+    paddingVertical: 10,
+    borderRadius: 12,
+    marginTop: 10,
+  },
+  cardButtonText: {
+    color: "#fff",
+    textAlign: "center",
+    fontWeight: "700",
+    fontSize: 15,
+  },
+  cardClose: {
+    position: "absolute",
+    right: 10,
+    top: 10,
+    padding: 6,
+    zIndex: 4,
   },
 });
