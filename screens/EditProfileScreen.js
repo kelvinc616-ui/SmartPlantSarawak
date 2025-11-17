@@ -15,6 +15,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { auth, db } from "../firebaseConfig";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { updatePassword } from "firebase/auth";
+import { storage } from "../firebaseConfig";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+
 
 export default function EditProfileScreen({ navigation }) {
   const user = auth.currentUser;
@@ -82,17 +85,34 @@ export default function EditProfileScreen({ navigation }) {
     }
 
     setSaving(true);
-    try {
+   try {
       let newAvatarUrl = avatarUrl;
 
       // Upload new avatar if selected
-      if (selectedImage) {
-        const storageRef = ref(storage, `avatars/${user.uid}_${Date.now()}.jpg`);
-        const img = await fetch(selectedImage);
-        const blob = await img.blob();
-        await uploadBytes(storageRef, blob);
-        newAvatarUrl = await getDownloadURL(storageRef);
-      }
+ if (selectedImage) {
+ const BUCKET_NAME = "smartplantsarawak-f13b9.firebasestorage.app";
+  const fileName = `${user.uid}_${Date.now()}.jpg`;
+
+  const uploadUrl = `https://firebasestorage.googleapis.com/v0/b/${BUCKET_NAME}/o/avatars%2F${encodeURIComponent(fileName)}?uploadType=media`;
+
+  // Fetch the local image and convert to blob
+  const img = await fetch(selectedImage);
+  const blob = await img.blob();
+
+  // Upload the blob using POST
+  const uploadResponse = await fetch(uploadUrl, {
+    method: "POST",
+    body: blob,
+    headers: { "Content-Type": "image/jpeg" },
+  });
+
+  if (!uploadResponse.ok) {
+    throw new Error(`Upload failed with status ${uploadResponse.status}`);
+  }
+
+  // Construct the publicly accessible URL
+  newAvatarUrl = `https://firebasestorage.googleapis.com/v0/b/${BUCKET_NAME}/o/avatars%2F${encodeURIComponent(fileName)}?alt=media`;
+}
 
       // Update Firestore
       const userRef = doc(db, "users", user.uid);
@@ -101,20 +121,21 @@ export default function EditProfileScreen({ navigation }) {
         avatarUrl: newAvatarUrl,
       });
 
-      // Update password if provided
-      if (password) {
-        await updatePassword(user, password);
-      }
+      if (password.trim() !== "") {
+    await updatePassword(user, password);
+}
+
 
       Alert.alert("Success", "Profile updated successfully!");
       navigation.goBack();
     } catch (err) {
       console.error("Error saving profile:", err);
-      Alert.alert("Error", "Failed to update profile. You may need to re-login to change password.");
+      Alert.alert("Error", "Failed to update profile.");
     } finally {
       setSaving(false);
     }
   };
+
 
   if (loading) {
     return (
