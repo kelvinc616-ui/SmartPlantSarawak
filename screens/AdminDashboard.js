@@ -6,8 +6,8 @@ import { Ionicons } from "@expo/vector-icons";
 export default function AdminDashboard({ navigation }) {
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>🌿 SmartPlant Admin Panel</Text>
-      <Text style={styles.subtitle}>Manage users, monitor predictions, and view analytics.</Text>
+      <Text style={styles.title}> SmartPlant Admin Panel</Text>
+      <Text style={styles.subtitle}>Manage users, monitor predictions, and view IoT Sensor data.</Text>
 
       <TouchableOpacity
         style={styles.card}
@@ -16,7 +16,7 @@ export default function AdminDashboard({ navigation }) {
         <Ionicons name="analytics-outline" size={26} color="#2E7D32" />
         <View style={{ marginLeft: 10 }}>
           <Text style={styles.cardTitle}>Manage Predictions</Text>
-          <Text style={styles.cardDesc}>View or delete user predictions.</Text>
+          <Text style={styles.cardDesc}>View, edit or delete user predictions.</Text>
         </View>
       </TouchableOpacity>
 
@@ -27,7 +27,7 @@ export default function AdminDashboard({ navigation }) {
         <Ionicons name="people-outline" size={26} color="#2E7D32" />
         <View style={{ marginLeft: 10 }}>
           <Text style={styles.cardTitle}>Manage Users</Text>
-          <Text style={styles.cardDesc}>View, promote, or remove users.</Text>
+          <Text style={styles.cardDesc}>View, edit or remove users.</Text>
         </View>
       </TouchableOpacity>
 

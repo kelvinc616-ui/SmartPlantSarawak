@@ -14,6 +14,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import MapView, { Marker } from "react-native-maps";
+import { useNavigation } from "@react-navigation/native";
 
 import {
   collection,
@@ -32,6 +33,7 @@ export default function ManagePredictions() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOrder, setSortOrder] = useState("desc");
+  const navigation = useNavigation();
 
   const [filter, setFilter] = useState("ALL"); // ⭐ FILTER STATE
 
@@ -90,6 +92,12 @@ export default function ManagePredictions() {
       return sortOrder === "desc" ? bTime - aTime : aTime - bTime;
     });
 
+      // --- FILTER ---
+  if (filter === "VERIFIED") {
+    list = list.filter((p) => p.verified_label === true);
+  } else if (filter === "UNVERIFIED") {
+    list = list.filter((p) => p.verified_label !== true);
+  }
     setFiltered(list);
   }, [predictions, filter, searchQuery, sortOrder]);
 
@@ -242,7 +250,7 @@ export default function ManagePredictions() {
   // -------------------------------------------------------
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>🌱 Manage Predictions</Text>
+      <Text style={styles.title}> Manage Predictions</Text>
 
       {/* Search + Sort */}
       <View style={styles.controls}>
@@ -300,7 +308,13 @@ export default function ManagePredictions() {
       ) : (
         filtered.map((item) => (
           <View key={item.id} style={styles.card}>
-            <Image source={{ uri: item.imageUrl }} style={styles.image} />
+              <TouchableOpacity
+              onPress={() =>
+              navigation.navigate("ObservationDetails", { observation: item })
+                }
+              >
+                <Image source={{ uri: item.imageUrl }} style={styles.image} />
+              </TouchableOpacity>
 
             <View style={styles.info}>
               <Text style={styles.label}>
