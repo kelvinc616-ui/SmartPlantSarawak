@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -6,6 +6,9 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  ScrollView,
+  RefreshControl,
+  Image
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { auth, db } from "../firebaseConfig";
@@ -16,8 +19,8 @@ export default function ProfileScreen({ navigation }) {
   const user = auth.currentUser;
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
     const fetchUserData = async () => {
       try {
         if (user?.uid) {
@@ -34,9 +37,11 @@ export default function ProfileScreen({ navigation }) {
         Alert.alert("Error", "Could not load profile data.");
       } finally {
         setLoading(false);
+        setRefreshing(false);
       }
     };
 
+  useEffect(() => {
     fetchUserData();
   }, [user]);
 
@@ -51,6 +56,11 @@ export default function ProfileScreen({ navigation }) {
     }
   };
 
+    const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchUserData();
+  }, []);
+  
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -61,7 +71,11 @@ export default function ProfileScreen({ navigation }) {
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={{ alignItems: "center", paddingTop: 80 }}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+    >
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>My Profile</Text>
@@ -69,9 +83,17 @@ export default function ProfileScreen({ navigation }) {
 
       {/* Profile Card */}
       <View style={styles.profileCard}>
-        <View style={styles.avatarContainer}>
-          <Ionicons name="person-circle-outline" size={100} color="#15931b" />
-        </View>
+       <View style={styles.avatarContainer}>
+  {userData?.avatarUrl ? (
+    <Image
+      source={{ uri: userData.avatarUrl }}
+      style={{ width: 100, height: 100, borderRadius: 50 }}
+    />
+  ) : (
+    <Ionicons name="person-circle-outline" size={100} color="#15931b" />
+  )}
+</View>
+
         <Text style={styles.username}>{userData?.username || "Unknown User"}</Text>
         <Text style={styles.email}>{userData?.email || user?.email || "No email found"}</Text>
         <Text style={styles.role}>Role: {userData?.role || "N/A"}</Text>
@@ -82,7 +104,7 @@ export default function ProfileScreen({ navigation }) {
         {/* Edit Button */}
         <TouchableOpacity
           style={[styles.button, styles.editButton]}
-          onPress={() => Alert.alert("Coming Soon", "Edit profile not yet available.")}
+          onPress={() => navigation.navigate("EditProfile")}
         >
           <Ionicons name="create-outline" size={18} color="#15931b" />
           <Text style={styles.editText}>Edit Profile</Text>
@@ -106,7 +128,7 @@ export default function ProfileScreen({ navigation }) {
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -115,14 +137,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f6f8f6",
-    alignItems: "center",
-    paddingTop: 80,
   },
   header: { marginBottom: 20 },
   title: {
     fontSize: 22,
     fontWeight: "700",
-    color: "#15931b",
+    color: "#145a32",
   },
   profileCard: {
     backgroundColor: "#fff",
@@ -169,7 +189,7 @@ const styles = StyleSheet.create({
 
  
   observationButton: {
-    backgroundColor: "#15931b",
+    backgroundColor: "#145a32",
     shadowColor: "#000",
     shadowOpacity: 0.1,
     shadowRadius: 3,

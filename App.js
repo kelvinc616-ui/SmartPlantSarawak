@@ -20,6 +20,7 @@ import ManagePredictions from "./screens/ManagePredictions";
 import MyObservations from "./screens/MyObservations";
 import SelectPredictionForLocation from "./screens/SelectPredictionForLocation";
 import AddLocationScreen from "./screens/AddLocationScreen";
+import EditProfileScreen from "./screens/EditProfileScreen";
 
 // Tab Navigators
 import UserMain from "./navigation/UserMain";
@@ -108,6 +109,12 @@ export default function App() {
         <Stack.Screen 
           name="AddLocation" 
           component={AddLocationScreen} 
+        />
+
+        <Stack.Screen
+         name="EditProfile"
+         component={EditProfileScreen}
+         options={{ title: "Edit Profile", headerShown: true }}
         />
 
       </Stack.Navigator>
