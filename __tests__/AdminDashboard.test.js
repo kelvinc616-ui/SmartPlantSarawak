@@ -33,7 +33,6 @@ describe("AdminDashboard Screen", () => {
 
     expect(getByText("Manage Predictions")).toBeTruthy();
     expect(getByText("Manage Users")).toBeTruthy();
-    expect(getByText("View Analytics")).toBeTruthy();
     expect(getByText("IoT Sensor Data")).toBeTruthy();
   });
 
@@ -52,12 +51,6 @@ describe("AdminDashboard Screen", () => {
     expect(mockNavigate).toHaveBeenCalledWith("ManageUsers");
   });
 
-  it("navigates to Analytics when the analytics card is pressed", () => {
-    const { getByText } = setup();
-
-    fireEvent.press(getByText("View Analytics"));
-    expect(mockNavigate).toHaveBeenCalledWith("Analytics");
-  });
 
   it("navigates to IoTMonitoring when IoT card is pressed", () => {
     const { getByText } = setup();
