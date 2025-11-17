@@ -8,6 +8,7 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
+  RefreshControl,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
@@ -18,6 +19,15 @@ export default function IdentifyScreen({ navigation }) {
   const [selectedImage, setSelectedImage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+const onRefresh = () => {
+  setRefreshing(true);
+  setSelectedImage(null);
+  setResult(null);
+  setLoading(false);
+  setRefreshing(false);
+};
 
   // 📸 Capture from camera
   const handleTakePhoto = async () => {
@@ -29,7 +39,7 @@ export default function IdentifyScreen({ navigation }) {
       }
 
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: "images",
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         quality: 1,
       });
@@ -54,7 +64,7 @@ export default function IdentifyScreen({ navigation }) {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: "images",
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         quality: 1,
       });
@@ -69,7 +79,7 @@ export default function IdentifyScreen({ navigation }) {
     }
   };
 
-  // 🌿 Identify Button → Upload → Predict → Ask User to Accept or Flag Unsure
+  // 🌿 Identify Button → Upload → Predict → Offer next action
   const handleIdentify = async () => {
     if (!selectedImage) {
       Alert.alert("No Image Selected", "Please upload or capture a photo first.");
@@ -84,8 +94,6 @@ export default function IdentifyScreen({ navigation }) {
       const uploadUrl = `https://firebasestorage.googleapis.com/v0/b/${BUCKET_NAME}/o/predictions%2F${encodeURIComponent(
         fileName
       )}?uploadType=media`;
-
-      console.log("Uploading image:", uploadUrl);
 
       const img = await fetch(selectedImage);
       const blob = await img.blob();
@@ -103,7 +111,6 @@ export default function IdentifyScreen({ navigation }) {
       const imageURL = `https://firebasestorage.googleapis.com/v0/b/${BUCKET_NAME}/o/predictions%2F${encodeURIComponent(
         fileName
       )}?alt=media`;
-      console.log("✅ Uploaded image URL:", imageURL);
 
       // 🔍 AI Prediction API
       const aiResponse = await fetch(
@@ -119,42 +126,38 @@ export default function IdentifyScreen({ navigation }) {
         throw new Error(`Prediction failed: HTTP ${aiResponse.status}`);
 
       const prediction = await aiResponse.json();
-      console.log("Prediction:", prediction);
-
       setResult(prediction);
 
-      // 🎯 Ask user whether they trust the result
+      // 🎯 Ask user what to do next: Add Location / Publish / Cancel
       Alert.alert(
         "AI Prediction",
         `${prediction.predicted_label} (${prediction.confidence}%)`,
         [
           {
-            text: "Accept Result",
+            text: "Add Location",
             onPress: async () => {
-              const docRef = await addDoc(collection(db, "predictions"), {
-                userId: user?.uid || "guest",
-                imageUrl: imageURL,
-                predicted_label: prediction.predicted_label,
-                confidence: prediction.confidence,
-                top_predictions: prediction.top_predictions || [],
-                model_version: prediction.model_version,
-                timestamp: serverTimestamp(),
-                flagged_unsure: false, // ✔ user accepted
-                verified_label: false,
-                verified_location: false,
-                share_location: false,
-              });
+const docRef = await addDoc(collection(db, "predictions"), {
+  userId: user?.uid || "guest",
+  imageUrl: imageURL,
+  predicted_label: prediction.predicted_label,
+  confidence: prediction.confidence,
+  top_predictions: prediction.top_predictions || [],
+  model_version: prediction.model_version,
+  timestamp: serverTimestamp(),
+  verified_label: false,
+  verified_location: false,
+  share_location: true,
+});
 
-              navigation.navigate("AddLocation", {
-                predictionId: docRef.id,
-                predicted_label: prediction.predicted_label,
-              });
+navigation.navigate("AddLocation", {
+  predictionId: docRef.id,
+  predicted_label: prediction.predicted_label,
+});
+
             },
           },
-
           {
-            text: "Flag as Unsure",
-            style: "destructive",
+            text: "Publish Result",
             onPress: async () => {
               await addDoc(collection(db, "predictions"), {
                 userId: user?.uid || "guest",
@@ -164,16 +167,13 @@ export default function IdentifyScreen({ navigation }) {
                 top_predictions: prediction.top_predictions || [],
                 model_version: prediction.model_version,
                 timestamp: serverTimestamp(),
-                flagged_unsure: true, // ✔ marked for admin
                 verified_label: false,
                 verified_location: false,
                 share_location: false,
               });
-
-              Alert.alert("Submitted for Review", "An admin will verify this prediction.");
+              Alert.alert("Published", "Your plant identification has been published.");
             },
           },
-
           { text: "Cancel", style: "cancel" },
         ]
       );
@@ -187,7 +187,13 @@ export default function IdentifyScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 40 }}
+         refreshControl={
+    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+  }
+      >
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -259,7 +265,7 @@ export default function IdentifyScreen({ navigation }) {
           )}
         </TouchableOpacity>
 
-        {/* Prediction Result (Optional Display) */}
+        {/* Prediction Result */}
         {result && (
           <View style={styles.resultBox}>
             <Text style={styles.resultText}>🌿 Species: {result.predicted_label}</Text>
@@ -282,7 +288,7 @@ export default function IdentifyScreen({ navigation }) {
   );
 }
 
-// 🎨 Styles (unchanged)
+// 🎨 Styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
