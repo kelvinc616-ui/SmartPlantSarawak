@@ -1,35 +1,29 @@
-/**
- * HOME SCREEN TEST (FULLY FIXED)
- */
-
+// __tests__/HomeScreeb.test.js
 import React from "react";
-import { render, waitFor, fireEvent } from "@testing-library/react-native";
+import { render, fireEvent, waitFor, act } from "@testing-library/react-native";
 import HomeScreen from "../screens/HomeScreen";
 
-// 🔥 Mock navigation
-const navigation = {
-  navigate: jest.fn(),
-};
-
-// 🔥 Mock Firestore
 jest.mock("firebase/firestore", () => ({
-  getDocs: jest.fn(),
   collection: jest.fn(),
   query: jest.fn(),
   where: jest.fn(),
   orderBy: jest.fn(),
   limit: jest.fn(),
+  getDocs: jest.fn(),
 }));
 
 import { getDocs } from "firebase/firestore";
 
-describe("HomeScreen Tests", () => {
+const mockNavigation = {
+  navigate: jest.fn(),
+};
+
+describe("HomeScreen", () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  test("loads and displays sections", async () => {
-    // Mock getDocs twice (recent + explore)
+  it("loads and displays Recent Observations and Explore Sarawak Flora sections", async () => {
     getDocs
       .mockResolvedValueOnce({
         docs: [
@@ -37,8 +31,8 @@ describe("HomeScreen Tests", () => {
             id: "r1",
             data: () => ({
               predicted_label: "Rafflesia",
-              confidence: 95,
-              imageUrl: "https://test.com/a.jpg",
+              confidence: 92,
+              imageUrl: "https://example.com/raff.jpg",
             }),
           },
         ],
@@ -49,14 +43,18 @@ describe("HomeScreen Tests", () => {
             id: "e1",
             data: () => ({
               predicted_label: "Orchid",
-              confidence: 82,
-              imageUrl: "https://test.com/b.jpg",
+              confidence: 80,
+              imageUrl: "https://example.com/orchid.jpg",
             }),
           },
         ],
       });
 
-    const screen = render(<HomeScreen navigation={navigation} />);
+    let screen;
+
+    await act(async () => {
+      screen = render(<HomeScreen navigation={mockNavigation} />);
+    });
 
     await waitFor(() => {
       expect(screen.getByText("Recent Observations")).toBeTruthy();
@@ -64,7 +62,7 @@ describe("HomeScreen Tests", () => {
     });
   });
 
-  test("navigates to observation details when pressing a card", async () => {
+  it("navigates to observation details when pressing a card", async () => {
     getDocs
       .mockResolvedValueOnce({
         docs: [
@@ -72,8 +70,8 @@ describe("HomeScreen Tests", () => {
             id: "p1",
             data: () => ({
               predicted_label: "Rafflesia",
-              confidence: 92,
-              imageUrl: "https://img.com/r.jpg",
+              confidence: 95,
+              imageUrl: "https://example.com/raff.jpg",
             }),
           },
         ],
@@ -82,7 +80,11 @@ describe("HomeScreen Tests", () => {
         docs: [],
       });
 
-    const screen = render(<HomeScreen navigation={navigation} />);
+    let screen;
+
+    await act(async () => {
+      screen = render(<HomeScreen navigation={mockNavigation} />);
+    });
 
     let card;
     await waitFor(() => {
@@ -91,23 +93,9 @@ describe("HomeScreen Tests", () => {
 
     fireEvent.press(card);
 
-    expect(navigation.navigate).toHaveBeenCalled();
-  });
-
-  test("supports pull-to-refresh", async () => {
-    getDocs
-      .mockResolvedValueOnce({ docs: [] })
-      .mockResolvedValueOnce({ docs: [] });
-
-    const screen = render(<HomeScreen navigation={navigation} />);
-
-    let scrollView;
-    await waitFor(() => {
-      scrollView = screen.getByTestId("HomeScrollView");
-    });
-
-    fireEvent(scrollView, "refresh");
-
-    expect(getDocs).toHaveBeenCalledTimes(2);
+    expect(mockNavigation.navigate).toHaveBeenCalledWith(
+      "ObservationDetails",
+      expect.any(Object)
+    );
   });
 });

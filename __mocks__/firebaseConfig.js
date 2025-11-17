@@ -1,14 +1,7 @@
 export const auth = {
-  currentUser: { uid: "test-user" },
-  signInWithEmailAndPassword: jest.fn(),
-  signOut: jest.fn(),
+  currentUser: { uid: "test-user", email: "test@example.com" },
 };
 
-export const db = {
-  // Firestore mock
-  collection: jest.fn(),
-};
+export const db = {};
 
 export const storage = {};
-
-export default {};

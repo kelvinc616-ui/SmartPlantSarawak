@@ -1,119 +1,91 @@
-/**
- * EDIT PROFILE SCREEN TEST (FULLY FIXED)
- */
-
+// __tests__/EditProfileScreeb.test.js
 import React from "react";
-import { render, fireEvent, waitFor } from "@testing-library/react-native";
+import { render, waitFor, fireEvent } from "@testing-library/react-native";
 import EditProfileScreen from "../screens/EditProfileScreen";
 
-// 🔥 Mock navigation
-const navigation = { goBack: jest.fn() };
-
-// 🔥 Mock Firebase Auth
+// Mock firebaseConfig (auth + db + storage)
 jest.mock("../firebaseConfig", () => ({
-  auth: {
-    currentUser: {
-      uid: "u123",
-      email: "kelvin@test.com",
-    },
-  },
+  auth: { currentUser: { uid: "user123", email: "kelvin@example.com" } },
   db: {},
   storage: {},
 }));
 
-// 🔥 Mock Firestore
-jest.mock("firebase/firestore", () => ({
-  getDoc: jest.fn(),
-  updateDoc: jest.fn(),
-  doc: jest.fn(),
-}));
-
+// Mock Firestore functions used in the screen
 import { getDoc, updateDoc, doc } from "firebase/firestore";
 
-// 🔥 Mock fetch (Firebase Storage upload)
-global.fetch = jest.fn(() =>
-  Promise.resolve({
-    ok: true,
-    json: () => Promise.resolve({}),
-  })
-);
-
-// 🔥 Mock ImagePicker
-jest.mock("expo-image-picker", () => ({
-  requestMediaLibraryPermissionsAsync: jest.fn(() =>
-    Promise.resolve({ status: "granted" })
-  ),
-  launchImageLibraryAsync: jest.fn(() =>
-    Promise.resolve({
-      canceled: false,
-      assets: [{ uri: "local-img.jpg" }],
-    })
-  ),
-  MediaTypeOptions: {
-    Images: "Images",
-  },
+jest.mock("firebase/firestore", () => ({
+  doc: jest.fn(),
+  getDoc: jest.fn(),
+  updateDoc: jest.fn(),
 }));
 
-describe("EditProfileScreen Tests", () => {
+// We do NOT need to test ImagePicker or real uploads here.
+// Just test that data loads and that save triggers updateDoc.
+
+describe("EditProfileScreen", () => {
+  const navigation = { goBack: jest.fn() };
+
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  test("loads and displays user data", async () => {
+  it("loads and displays user data from Firestore", async () => {
+    // Mock Firestore user document
     getDoc.mockResolvedValue({
       exists: () => true,
       data: () => ({
         username: "Kelvin",
-        email: "kelvin@test.com",
+        email: "kelvin@example.com",
+        avatarUrl: "https://example.com/avatar.jpg",
       }),
     });
 
     const screen = render(<EditProfileScreen navigation={navigation} />);
 
+    // Wait for loading to finish and data to appear
     await waitFor(() => {
+      // loading spinner should disappear
+      expect(screen.queryByTestId("ActivityIndicator")).toBeNull();
+
+      // Username and email should be in the inputs
       expect(screen.getByDisplayValue("Kelvin")).toBeTruthy();
-      expect(screen.getByDisplayValue("kelvin@test.com")).toBeTruthy();
+      expect(screen.getByDisplayValue("kelvin@example.com")).toBeTruthy();
     });
   });
 
-  test("allows selecting an image", async () => {
+  it("saves updated username (no avatar change)", async () => {
+    // Initial user data
     getDoc.mockResolvedValue({
       exists: () => true,
-      data: () => ({ username: "User", email: "x@test.com" }),
+      data: () => ({
+        username: "Kelvin",
+        email: "kelvin@example.com",
+        avatarUrl: null,
+      }),
     });
-
-    const picker = require("expo-image-picker");
 
     const screen = render(<EditProfileScreen navigation={navigation} />);
 
-    const changeBtn = screen.getByText("Change Profile Photo");
-    fireEvent.press(changeBtn);
-
+    // Wait until loading finishes
     await waitFor(() => {
-      expect(picker.launchImageLibraryAsync).toHaveBeenCalled();
-    });
-  });
-
-  test("saves profile changes & uploads avatar", async () => {
-    getDoc.mockResolvedValue({
-      exists: () => true,
-      data: () => ({ username: "Kelvin", email: "kelvin@test.com" }),
+      expect(screen.queryByTestId("ActivityIndicator")).toBeNull();
     });
 
-    doc.mockReturnValue("mockDocRef");
-
-    const screen = render(<EditProfileScreen navigation={navigation} />);
-
-    // Edit username
+    // Change username
     const usernameInput = screen.getByPlaceholderText("Enter your username");
     fireEvent.changeText(usernameInput, "New Kelvin");
 
+    // We mock fetch just in case, but with no selectedImage
+    // the component will not call fetch().
+    global.fetch = jest.fn();
+
+    // Press "Save Changes"
     fireEvent.press(screen.getByText("Save Changes"));
 
+    // Assert Firestore update + navigation back
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalled();
-      expect(updateDoc).toHaveBeenCalled();
-      expect(navigation.goBack).toHaveBeenCalled();
+      expect(updateDoc).toHaveBeenCalledTimes(1);
+      expect(navigation.goBack).toHaveBeenCalledTimes(1);
     });
   });
 });

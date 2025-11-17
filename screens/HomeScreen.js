@@ -138,7 +138,7 @@ export default function HomeScreen({ navigation }) {
               recentPredictions.map((item) => (
                 <TouchableOpacity
                   key={item.id}
-                  testID={`explore-${plant.id}`}
+                  testID={`recent-${item.id}`}
                   style={styles.card}
                   onPress={() =>
                     navigation.navigate("ObservationDetails", {
