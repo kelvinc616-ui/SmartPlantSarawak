@@ -23,40 +23,52 @@ export default function RegisterScreen({ navigation }) {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleRegister = async () => {
-    if (!username.trim()) {
-      Alert.alert("Missing field", "Please enter a username.");
-      return;
-    }
-    if (password !== confirmPassword) {
-      Alert.alert("Password mismatch", "Passwords do not match!");
-      return;
-    }
+const handleRegister = async () => {
+  if (!username.trim()) {
+    Alert.alert("Missing field", "Please enter a username.");
+    return;
+  }
 
-    try {
-      setLoading(true);
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
+  if (password !== confirmPassword) {
+    Alert.alert("Password mismatch", "Passwords do not match!");
+    return;
+  }
 
-      // Send verification email
-      await sendEmailVerification(user);
+  // ✅ Password validation
+  const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{8,}$/;
+  if (!passwordRegex.test(password)) {
+    Alert.alert(
+      "Weak Password",
+      "Password must be at least 8 characters long, and include at least one letter, one number, and one special character."
+    );
+    return;
+  }
 
-      // Save extra user data
-      await setDoc(doc(db, "users", user.uid), {
-        username: username.trim(),
-        email: email.trim(),
-        role: "public",
-        createdAt: new Date(),
-      });
+  try {
+    setLoading(true);
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
 
-      Alert.alert("Success", "Check your email to verify your account.");
-      navigation.replace("Login");
-    } catch (error) {
-      Alert.alert("Registration failed", error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+    // Send verification email
+    await sendEmailVerification(user);
+
+    // Save extra user data
+    await setDoc(doc(db, "users", user.uid), {
+      username: username.trim(),
+      email: email.trim(),
+      role: "public",
+      createdAt: new Date(),
+    });
+
+    Alert.alert("Success", "Check your email to verify your account.");
+    navigation.replace("Login");
+  } catch (error) {
+    Alert.alert("Registration failed", error.message);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <ImageBackground

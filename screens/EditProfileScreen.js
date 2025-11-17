@@ -12,9 +12,9 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
-import { auth, db, storage } from "../firebaseConfig";
+import { auth, db } from "../firebaseConfig";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { updatePassword } from "firebase/auth";
 
 export default function EditProfileScreen({ navigation }) {
   const user = auth.currentUser;
@@ -24,6 +24,8 @@ export default function EditProfileScreen({ navigation }) {
   const [selectedImage, setSelectedImage] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   // Load current user data
   useEffect(() => {
@@ -74,35 +76,23 @@ export default function EditProfileScreen({ navigation }) {
       return;
     }
 
+    if (password && password !== confirmPassword) {
+      Alert.alert("Validation Error", "Passwords do not match.");
+      return;
+    }
+
     setSaving(true);
     try {
       let newAvatarUrl = avatarUrl;
 
       // Upload new avatar if selected
- if (selectedImage) {
- const BUCKET_NAME = "smartplantsarawak-f13b9.firebasestorage.app";
-  const fileName = `${user.uid}_${Date.now()}.jpg`;
-
-  const uploadUrl = `https://firebasestorage.googleapis.com/v0/b/${BUCKET_NAME}/o/avatars%2F${encodeURIComponent(fileName)}?uploadType=media`;
-
-  // Fetch the local image and convert to blob
-  const img = await fetch(selectedImage);
-  const blob = await img.blob();
-
-  // Upload the blob using POST
-  const uploadResponse = await fetch(uploadUrl, {
-    method: "POST",
-    body: blob,
-    headers: { "Content-Type": "image/jpeg" },
-  });
-
-  if (!uploadResponse.ok) {
-    throw new Error(`Upload failed with status ${uploadResponse.status}`);
-  }
-
-  // Construct the publicly accessible URL
-  newAvatarUrl = `https://firebasestorage.googleapis.com/v0/b/${BUCKET_NAME}/o/avatars%2F${encodeURIComponent(fileName)}?alt=media`;
-}
+      if (selectedImage) {
+        const storageRef = ref(storage, `avatars/${user.uid}_${Date.now()}.jpg`);
+        const img = await fetch(selectedImage);
+        const blob = await img.blob();
+        await uploadBytes(storageRef, blob);
+        newAvatarUrl = await getDownloadURL(storageRef);
+      }
 
       // Update Firestore
       const userRef = doc(db, "users", user.uid);
@@ -111,11 +101,16 @@ export default function EditProfileScreen({ navigation }) {
         avatarUrl: newAvatarUrl,
       });
 
+      // Update password if provided
+      if (password) {
+        await updatePassword(user, password);
+      }
+
       Alert.alert("Success", "Profile updated successfully!");
       navigation.goBack();
     } catch (err) {
       console.error("Error saving profile:", err);
-      Alert.alert("Error", "Failed to update profile.");
+      Alert.alert("Error", "Failed to update profile. You may need to re-login to change password.");
     } finally {
       setSaving(false);
     }
@@ -161,6 +156,29 @@ export default function EditProfileScreen({ navigation }) {
           style={[styles.input, { backgroundColor: "#eee" }]}
           value={email}
           editable={false}
+        />
+      </View>
+
+      {/* Password */}
+      <View style={styles.inputContainer}>
+        <Text style={styles.label}>New Password</Text>
+        <TextInput
+          style={styles.input}
+          value={password}
+          onChangeText={setPassword}
+          placeholder="Enter new password"
+          secureTextEntry
+        />
+      </View>
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.label}>Confirm Password</Text>
+        <TextInput
+          style={styles.input}
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
+          placeholder="Confirm new password"
+          secureTextEntry
         />
       </View>
 

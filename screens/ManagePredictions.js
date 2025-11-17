@@ -12,20 +12,20 @@ import {
   Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import * as ImagePicker from "expo-image-picker";   // ⭐ ADDED
+import * as ImagePicker from "expo-image-picker";
 import MapView, { Marker } from "react-native-maps";
+import { useNavigation } from "@react-navigation/native";
+
 import {
   collection,
   getDocs,
   deleteDoc,
   doc,
   updateDoc,
-  query,
-  where,
 } from "firebase/firestore";
 
-import { db, storage } from "../firebaseConfig";  
-import { ref, uploadBytes, deleteObject, getDownloadURL } from "firebase/storage"; // ⭐ ADDED
+import { db, storage } from "../firebaseConfig";
+import { ref, uploadBytes, deleteObject, getDownloadURL } from "firebase/storage";
 
 export default function ManagePredictions() {
   const [predictions, setPredictions] = useState([]);
@@ -33,21 +33,21 @@ export default function ManagePredictions() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOrder, setSortOrder] = useState("desc");
+  const navigation = useNavigation();
+
+  const [filter, setFilter] = useState("ALL"); // ⭐ FILTER STATE
+
   const [editingPrediction, setEditingPrediction] = useState(null);
   const [newLabel, setNewLabel] = useState("");
   const [showMap, setShowMap] = useState(false);
+  const [newVerifiedImage, setNewVerifiedImage] = useState(null);
 
-  const [newVerifiedImage, setNewVerifiedImage] = useState(null); // ⭐ ADDED
-
-  // 🔥 Fetch ONLY predictions flagged as unsure
+  // -------------------------------------------------------
+  // 🔥 FETCH ALL PREDICTIONS
+  // -------------------------------------------------------
   const fetchPredictions = async () => {
     try {
-      const q = query(
-        collection(db, "predictions"),
-        where("flagged_unsure", "==", true)
-      );
-
-      const snapshot = await getDocs(q);
+      const snapshot = await getDocs(collection(db, "predictions"));
 
       const list = snapshot.docs.map((docSnap) => {
         const data = docSnap.data();
@@ -70,69 +70,93 @@ export default function ManagePredictions() {
     }
   };
 
-  const deletePrediction = async (id) => {
-    Alert.alert("Confirm Delete", "Are you sure you want to delete this prediction?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await deleteDoc(doc(db, "predictions", id));
-
-            const updated = predictions.filter((p) => p.id !== id);
-            setPredictions(updated);
-            setFiltered(updated);
-
-            Alert.alert("Deleted", "Prediction removed successfully.");
-          } catch (error) {
-            console.error("Error deleting:", error);
-            Alert.alert("Error", "Failed to delete prediction.");
-          }
-        },
-      },
-    ]);
-  };
-
-  const handleSearch = (text) => {
-    setSearchQuery(text);
-    if (text.trim() === "") {
-      setFiltered(predictions);
-    } else {
-      const queryLower = text.toLowerCase();
-      const results = predictions.filter(
+  // -------------------------------------------------------
+  // 🔥 FILTERING: ALL / VERIFIED / UNVERIFIED
+  // -------------------------------------------------------
+  useEffect(() => {
+    let list = [...predictions];
+    // search
+    if (searchQuery.trim() !== "") {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(
         (p) =>
-          p.predicted_label?.toLowerCase().includes(queryLower) ||
-          p.userId?.toLowerCase().includes(queryLower)
+          p.predicted_label?.toLowerCase().includes(q) ||
+          p.userId?.toLowerCase().includes(q)
       );
-      setFiltered(results);
     }
-  };
 
-  const handleSort = () => {
-    const newOrder = sortOrder === "desc" ? "asc" : "desc";
-    setSortOrder(newOrder);
-
-    const sorted = [...filtered].sort((a, b) => {
+    // sorting
+    list.sort((a, b) => {
       const aTime = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.timestamp);
       const bTime = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(b.timestamp);
-      return newOrder === "desc" ? bTime - aTime : aTime - bTime;
+      return sortOrder === "desc" ? bTime - aTime : aTime - bTime;
     });
 
-    setFiltered(sorted);
+      // --- FILTER ---
+  if (filter === "VERIFIED") {
+    list = list.filter((p) => p.verified_label === true);
+  } else if (filter === "UNVERIFIED") {
+    list = list.filter((p) => p.verified_label !== true);
+  }
+    setFiltered(list);
+  }, [predictions, filter, searchQuery, sortOrder]);
+
+  // -------------------------------------------------------
+  // DELETE
+  // -------------------------------------------------------
+  const deletePrediction = async (id) => {
+    Alert.alert(
+      "Confirm Delete",
+      "Are you sure you want to delete this prediction?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteDoc(doc(db, "predictions", id));
+              const updated = predictions.filter((p) => p.id !== id);
+              setPredictions(updated);
+              setFiltered(updated);
+            } catch (err) {
+              console.error("Delete failed:", err);
+              Alert.alert("Error", "Failed to delete.");
+            }
+          },
+        },
+      ]
+    );
   };
 
+  // -------------------------------------------------------
+  // SEARCH
+  // -------------------------------------------------------
+  const handleSearch = (text) => {
+    setSearchQuery(text);
+  };
+
+  // -------------------------------------------------------
+  // SORT
+  // -------------------------------------------------------
+  const handleSort = () => {
+    setSortOrder(sortOrder === "desc" ? "asc" : "desc");
+  };
+
+  // -------------------------------------------------------
+  // EDITING
+  // -------------------------------------------------------
   const startEditing = (item) => {
     setEditingPrediction(item);
     setNewLabel(item.predicted_label);
-    setNewVerifiedImage(null); // ⭐ reset
+    setNewVerifiedImage(null);
   };
 
-  // ⭐ Pick verified image
+  // PICK VERIFIED IMAGE
   const pickVerifiedImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert("Permission Required", "Allow gallery access to upload image.");
+      Alert.alert("Permission Required", "Allow gallery access.");
       return;
     }
 
@@ -146,45 +170,40 @@ export default function ManagePredictions() {
     }
   };
 
-  // ⭐ Upload new image + delete old one
+  // UPLOAD NEW IMAGE & DELETE OLD
   const uploadVerifiedImage = async (oldUrl, predictionId) => {
-    if (!newVerifiedImage) return oldUrl; // nothing changed
+    if (!newVerifiedImage) return oldUrl;
 
     try {
       const filename = `verified_${predictionId}_${Date.now()}.jpg`;
       const storageRef = ref(storage, `predictions/${filename}`);
 
-      // upload new file
       const img = await fetch(newVerifiedImage);
       const blob = await img.blob();
       await uploadBytes(storageRef, blob);
 
       const downloadURL = await getDownloadURL(storageRef);
 
-      // delete OLD image
+      // delete old
       try {
         const oldRef = ref(storage, decodeURIComponent(oldUrl.split("/o/")[1].split("?")[0]));
         await deleteObject(oldRef);
-      } catch (err) {
-        console.warn("Old image delete failed (ignored):", err);
-      }
+      } catch (err) {}
 
       return downloadURL;
     } catch (err) {
-      console.error("Image upload failed:", err);
-      Alert.alert("Error", "Failed to upload verified image.");
+      console.error("Upload failed:", err);
       return oldUrl;
     }
   };
 
-  // 🔥 Save verified label/location + NEW verified image
+  // SAVE EDIT
   const saveEdit = async () => {
     if (!editingPrediction) return;
 
     try {
       const docRef = doc(db, "predictions", editingPrediction.id);
 
-      // ⭐ Upload image if selected
       const updatedImageUrl = await uploadVerifiedImage(
         editingPrediction.imageUrl,
         editingPrediction.id
@@ -194,30 +213,29 @@ export default function ManagePredictions() {
         predicted_label: newLabel,
         verified_label: editingPrediction.verified_label || false,
         verified_location: editingPrediction.verified_location || false,
-        flagged_unsure: false,
-        imageUrl: updatedImageUrl, // ⭐ replace original image
+        imageUrl: updatedImageUrl,
       });
 
-      // Remove from admin list
-      const updated = predictions.filter((p) => p.id !== editingPrediction.id);
-      setPredictions(updated);
-      setFiltered(updated);
+      const updatedList = predictions.filter((p) => p.id !== editingPrediction.id);
+      setPredictions(updatedList);
 
       setEditingPrediction(null);
-      setNewLabel("");
       setNewVerifiedImage(null);
-
-      Alert.alert("Updated", "Prediction verified successfully.");
-    } catch (error) {
-      console.error("Error updating:", error);
-      Alert.alert("Error", "Failed to update prediction.");
+      setNewLabel("");
+    } catch (err) {
+      console.error("Update failed:", err);
+      Alert.alert("Error", "Failed to update.");
     }
   };
 
+  // INITIAL LOAD
   useEffect(() => {
     fetchPredictions();
   }, []);
 
+  // -------------------------------------------------------
+  // LOADING SCREEN
+  // -------------------------------------------------------
   if (loading) {
     return (
       <View style={styles.center}>
@@ -227,11 +245,14 @@ export default function ManagePredictions() {
     );
   }
 
+  // -------------------------------------------------------
+  // UI RENDER
+  // -------------------------------------------------------
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>🌱 Manage Flagged Predictions</Text>
+      <Text style={styles.title}> Manage Predictions</Text>
 
-      {/* Search & Sort Controls */}
+      {/* Search + Sort */}
       <View style={styles.controls}>
         <View style={styles.searchBox}>
           <Ionicons name="search-outline" size={18} color="#777" />
@@ -256,15 +277,44 @@ export default function ManagePredictions() {
         </TouchableOpacity>
       </View>
 
+      {/* ⭐ FILTER BUTTONS */}
+      <View style={styles.filterRow}>
+        {["ALL", "VERIFIED", "UNVERIFIED"].map((type) => (
+          <TouchableOpacity
+            key={type}
+            onPress={() => setFilter(type)}
+            style={[
+              styles.filterButton,
+              filter === type && styles.filterButtonActive,
+            ]}
+          >
+            <Text
+              style={[
+                styles.filterText,
+                filter === type && styles.filterTextActive,
+              ]}
+            >
+              {type}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
       {/* Prediction Cards */}
       {filtered.length === 0 ? (
         <View style={styles.noResults}>
-          <Text style={{ color: "#555", marginTop: 10 }}>No flagged predictions 🎉</Text>
+          <Text style={{ color: "#555", marginTop: 10 }}>No predictions found.</Text>
         </View>
       ) : (
         filtered.map((item) => (
           <View key={item.id} style={styles.card}>
-            <Image source={{ uri: item.imageUrl }} style={styles.image} />
+              <TouchableOpacity
+              onPress={() =>
+              navigation.navigate("ObservationDetails", { observation: item })
+                }
+              >
+                <Image source={{ uri: item.imageUrl }} style={styles.image} />
+              </TouchableOpacity>
 
             <View style={styles.info}>
               <Text style={styles.label}>
@@ -309,7 +359,6 @@ export default function ManagePredictions() {
           <View style={styles.modalBox}>
             <Text style={styles.modalTitle}>Edit & Verify</Text>
 
-            {/* Label Input */}
             <TextInput
               style={styles.modalInput}
               value={newLabel}
@@ -318,7 +367,6 @@ export default function ManagePredictions() {
               placeholderTextColor="#999"
             />
 
-            {/* ⭐ PICK Verified Image */}
             <TouchableOpacity style={styles.uploadBtn} onPress={pickVerifiedImage}>
               <Ionicons name="image-outline" size={22} color="#2E7D32" />
               <Text style={styles.uploadText}>Upload Verified Image</Text>
@@ -331,7 +379,7 @@ export default function ManagePredictions() {
               />
             )}
 
-            {/* Checkboxes */}
+            {/* Checkbox: Verified Label */}
             <TouchableOpacity
               style={styles.verifyRow}
               onPress={() =>
@@ -353,6 +401,7 @@ export default function ManagePredictions() {
               <Text style={styles.verifyText}>Mark Label as Verified</Text>
             </TouchableOpacity>
 
+            {/* Checkbox: Verified Location */}
             <TouchableOpacity
               style={styles.verifyRow}
               onPress={() =>
@@ -374,11 +423,11 @@ export default function ManagePredictions() {
               <Text style={styles.verifyText}>Mark Location as Verified</Text>
             </TouchableOpacity>
 
-            {/* Save */}
             <View style={styles.modalButtons}>
               <TouchableOpacity style={styles.saveButton} onPress={saveEdit}>
                 <Text style={styles.saveText}>Save</Text>
               </TouchableOpacity>
+
               <TouchableOpacity
                 style={styles.cancelButton}
                 onPress={() => {
@@ -393,11 +442,12 @@ export default function ManagePredictions() {
         </View>
       </Modal>
 
-      {/* Map Preview Modal */}
+      {/* Map Modal */}
       <Modal visible={showMap} transparent animationType="slide">
         <View style={styles.modalContainer}>
           <View style={styles.mapBox}>
             <Text style={styles.modalTitle}>Location Preview</Text>
+
             {editingPrediction?.lat && editingPrediction?.lng ? (
               <MapView
                 style={styles.previewMap}
@@ -418,9 +468,10 @@ export default function ManagePredictions() {
               </MapView>
             ) : (
               <Text style={{ textAlign: "center", color: "#999" }}>
-                No location available
+                No location available.
               </Text>
             )}
+
             <TouchableOpacity
               style={[styles.cancelButton, { alignSelf: "center", marginTop: 15 }]}
               onPress={() => setShowMap(false)}
@@ -444,24 +495,10 @@ const styles = StyleSheet.create({
     marginTop: 30,
     marginBottom: 20,
   },
-    uploadBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 10,
-    backgroundColor: "#eaf7ea",
-    padding: 10,
-    borderRadius: 8,
-  },
-  uploadText: {
-    marginLeft: 8,
-    fontSize: 15,
-    color: "#2E7D32",
-    fontWeight: "600",
-  },
   controls: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 15,
+    marginBottom: 10,
     gap: 10,
   },
   searchBox: {
@@ -487,6 +524,35 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   sortText: { color: "#fff", fontSize: 13, fontWeight: "500", marginLeft: 5 },
+
+  // ⭐ FILTER BUTTON STYLES
+  filterRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 15,
+  },
+  filterButton: {
+    flex: 1,
+    marginHorizontal: 5,
+    paddingVertical: 8,
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#2E7D32",
+    alignItems: "center",
+  },
+  filterButtonActive: {
+    backgroundColor: "#2E7D32",
+  },
+  filterText: {
+    color: "#2E7D32",
+    fontWeight: "600",
+    fontSize: 13,
+  },
+  filterTextActive: {
+    color: "#fff",
+  },
+
   card: {
     backgroundColor: "#fff",
     borderRadius: 12,
@@ -501,7 +567,6 @@ const styles = StyleSheet.create({
   info: { marginBottom: 8 },
   label: { fontSize: 16, fontWeight: "600", color: "#1a1a1a" },
   verified_label: { color: "#2E7D32", fontWeight: "700" },
-  verified_location: { color: "#00796B", fontWeight: "700" },
   confidence: { fontSize: 13, color: "#2E7D32" },
   timestamp: { fontSize: 12, color: "#666", marginTop: 3 },
   model: { fontSize: 12, color: "#888" },
@@ -518,6 +583,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 20 },
+
   modalContainer: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -529,9 +595,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 20,
     width: "85%",
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
   },
   modalTitle: { fontSize: 18, fontWeight: "700", color: "#2E7D32", marginBottom: 10 },
   modalInput: {
@@ -542,6 +605,20 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     fontSize: 14,
     color: "#333",
+  },
+  uploadBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+    backgroundColor: "#eaf7ea",
+    padding: 10,
+    borderRadius: 8,
+  },
+  uploadText: {
+    marginLeft: 8,
+    fontSize: 15,
+    color: "#2E7D32",
+    fontWeight: "600",
   },
   modalButtons: { flexDirection: "row", justifyContent: "flex-end", gap: 10 },
   saveButton: {
@@ -568,6 +645,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#333",
   },
+
   mapBox: {
     backgroundColor: "#fff",
     borderRadius: 12,
@@ -575,9 +653,6 @@ const styles = StyleSheet.create({
     width: "90%",
     height: 400,
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
   },
   previewMap: {
     width: "100%",

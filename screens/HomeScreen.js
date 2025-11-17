@@ -280,9 +280,6 @@ export default function HomeScreen({ navigation }) {
                         <Text style={styles.cardButtonSecondaryText}>DETAILS</Text>
                       </TouchableOpacity>
 
-                      <TouchableOpacity style={styles.cardButtonPrimary}>
-                        <Text style={styles.cardButtonPrimaryText}>FLAG</Text>
-                      </TouchableOpacity>
                     </View>
                   </View>
                 </View>
