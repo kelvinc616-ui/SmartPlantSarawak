@@ -31,17 +31,6 @@ export default function AdminDashboard({ navigation }) {
         </View>
       </TouchableOpacity>
 
-      <TouchableOpacity
-        style={styles.card}
-        onPress={() => navigation.navigate("Analytics")}
-      >
-        <Ionicons name="stats-chart-outline" size={26} color="#2E7D32" />
-        <View style={{ marginLeft: 10 }}>
-          <Text style={styles.cardTitle}>View Analytics</Text>
-          <Text style={styles.cardDesc}>Check prediction usage and performance metrics.</Text>
-        </View>
-      </TouchableOpacity>
-
             {/* IoT Card */}
       <TouchableOpacity
         style={styles.card}
