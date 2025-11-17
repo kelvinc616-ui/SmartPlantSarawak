@@ -124,7 +124,7 @@ export default function EditProfileScreen({ navigation }) {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#15931b" />
+        <ActivityIndicator size="large" color="#15931b" testID="ActivityIndicator" />
       </View>
     );
   }

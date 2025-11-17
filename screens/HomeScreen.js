@@ -76,7 +76,8 @@ export default function HomeScreen({ navigation }) {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#15931b" />
+        
+        <ActivityIndicator testID="ActivityIndicator" size="large" color="#15931b" />
       </View>
     );
   }
@@ -94,6 +95,7 @@ export default function HomeScreen({ navigation }) {
       </View>
 
       <ScrollView
+        testID="HomeScrollView"
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -136,6 +138,7 @@ export default function HomeScreen({ navigation }) {
               recentPredictions.map((item) => (
                 <TouchableOpacity
                   key={item.id}
+                  testID={`explore-${plant.id}`}
                   style={styles.card}
                   onPress={() =>
                     navigation.navigate("ObservationDetails", {
@@ -176,6 +179,7 @@ export default function HomeScreen({ navigation }) {
             {explorePlants.map((plant) => (
               <TouchableOpacity
                 key={plant.id}
+                testID={`explore-${plant.id}`}
                 style={styles.card}
                 onPress={() =>
                   navigation.navigate("ObservationDetails", {
