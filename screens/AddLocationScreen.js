@@ -27,7 +27,7 @@ export default function AddLocation({ route, navigation }) {
   const [saving, setSaving] = useState(false);
   const [searching, setSearching] = useState(false);
 
-  // 🧭 Get user’s current location
+  // Get user’s current location
   useEffect(() => {
     (async () => {
       try {
@@ -60,7 +60,7 @@ export default function AddLocation({ route, navigation }) {
     })();
   }, []);
 
-  // 📍 Fetch readable address from coordinates
+  // Fetch readable address from coordinates
   const fetchAddress = async (coords) => {
     try {
       const result = await Location.reverseGeocodeAsync(coords);
@@ -74,7 +74,7 @@ export default function AddLocation({ route, navigation }) {
     }
   };
 
-  // 🧭 Search by place name
+  //  Search by place name
   const handleSearch = async () => {
     const trimmed = query.trim();
     if (!trimmed) return;
@@ -102,14 +102,14 @@ export default function AddLocation({ route, navigation }) {
     }
   };
 
-  // 🎯 User drags pin
+  // User drags pin
   const onMarkerDragEnd = (e) => {
     const coords = e.nativeEvent.coordinate;
     setMarkerPosition(coords);
     fetchAddress(coords);
   };
 
-  // 🎯 Center to user
+  // Center to user
   const handleCenterToUser = () => {
     if (userLocation && mapRef.current) {
       mapRef.current.animateToRegion({
@@ -122,7 +122,7 @@ export default function AddLocation({ route, navigation }) {
     }
   };
 
-  // 💾 Save location to Firestore
+  // Save location to Firestore
   const handleSaveLocation = async () => {
     if (!markerPosition) {
       Alert.alert("No Location", "Please select a location first.");
@@ -151,7 +151,7 @@ export default function AddLocation({ route, navigation }) {
     }
   };
 
-  // 🗺️ Render
+  // Render
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -253,7 +253,7 @@ export default function AddLocation({ route, navigation }) {
   );
 }
 
-// 🎨 Styles
+// Styles
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f6f8f6" },
   header: {
@@ -305,8 +305,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     elevation: 4,
   },
-
-  // Mini preview card
+  
   infoCard: {
     position: "absolute",
     bottom: 20,

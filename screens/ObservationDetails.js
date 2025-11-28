@@ -15,7 +15,7 @@ export default function ObservationDetails({ route }) {
     );
   }
 
-  // 🔹 Safely extract all fields (with fallbacks)
+  // Safely extract all fields (with fallbacks)
   const {
     imageUrl,
     title,
@@ -31,22 +31,22 @@ export default function ObservationDetails({ route }) {
     share_location,
   } = obs;
 
-  // 🔹 Determine display name
+  // Determine display name
   const displayName =
     title || corrected_label || predicted_label || "Unknown Species";
 
-  // 🔹 Ensure confidence is displayed correctly
+  // Ensure confidence is displayed correctly
   const formattedConfidence =
     typeof confidence === "number" ? confidence.toFixed(2) : "N/A";
 
-  // 🔹 Convert Firestore timestamp to readable format
+  // Convert Firestore timestamp to readable format
   const formattedTime = timestamp?.seconds
     ? new Date(timestamp.seconds * 1000).toLocaleString()
     : "Unknown";
 
   return (
     <ScrollView style={styles.container}>
-      {/* 🖼️ Image Section */}
+      {/* Image Section */}
       {imageUrl ? (
         <Image
           source={{ uri: imageUrl }}
@@ -59,10 +59,10 @@ export default function ObservationDetails({ route }) {
         </View>
       )}
 
-      {/* 🌿 Title */}
+      {/* Title */}
       <Text style={styles.title}>{displayName}</Text>
 
-      {/* 🌍 Details */}
+      {/* Details */}
       <View style={styles.detailsBox}>
         <Text style={styles.info}>
           Confidence: {formattedConfidence}%
@@ -98,7 +98,7 @@ export default function ObservationDetails({ route }) {
         </Text>
       </View>
 
-      {/* 📊 Top Predictions */}
+      {/* Top Predictions */}
       {top_predictions && top_predictions.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Top Predictions</Text>
@@ -121,7 +121,7 @@ export default function ObservationDetails({ route }) {
   );
 }
 
-// 💅 Styles
+// Styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,

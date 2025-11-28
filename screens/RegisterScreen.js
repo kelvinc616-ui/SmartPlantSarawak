@@ -34,7 +34,7 @@ const handleRegister = async () => {
     return;
   }
 
-  // ✅ Password validation
+  // Password validation
   const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{8,}$/;
   if (!passwordRegex.test(password)) {
     Alert.alert(

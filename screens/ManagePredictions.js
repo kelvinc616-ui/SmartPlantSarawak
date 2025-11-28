@@ -35,16 +35,14 @@ export default function ManagePredictions() {
   const [sortOrder, setSortOrder] = useState("desc");
   const navigation = useNavigation();
 
-  const [filter, setFilter] = useState("ALL"); // ⭐ FILTER STATE
+  const [filter, setFilter] = useState("ALL");
 
   const [editingPrediction, setEditingPrediction] = useState(null);
   const [newLabel, setNewLabel] = useState("");
   const [showMap, setShowMap] = useState(false);
   const [newVerifiedImage, setNewVerifiedImage] = useState(null);
 
-  // -------------------------------------------------------
-  // 🔥 FETCH ALL PREDICTIONS
-  // -------------------------------------------------------
+//Fetch all predictions
   const fetchPredictions = async () => {
     try {
       const snapshot = await getDocs(collection(db, "predictions"));
@@ -70,9 +68,7 @@ export default function ManagePredictions() {
     }
   };
 
-  // -------------------------------------------------------
-  // 🔥 FILTERING: ALL / VERIFIED / UNVERIFIED
-  // -------------------------------------------------------
+//FIlter all, verified and unverified
   useEffect(() => {
     let list = [...predictions];
     // search
@@ -92,7 +88,6 @@ export default function ManagePredictions() {
       return sortOrder === "desc" ? bTime - aTime : aTime - bTime;
     });
 
-      // --- FILTER ---
   if (filter === "VERIFIED") {
     list = list.filter((p) => p.verified_label === true);
   } else if (filter === "UNVERIFIED") {
@@ -101,9 +96,6 @@ export default function ManagePredictions() {
     setFiltered(list);
   }, [predictions, filter, searchQuery, sortOrder]);
 
-  // -------------------------------------------------------
-  // DELETE
-  // -------------------------------------------------------
   const deletePrediction = async (id) => {
     Alert.alert(
       "Confirm Delete",
@@ -129,23 +121,14 @@ export default function ManagePredictions() {
     );
   };
 
-  // -------------------------------------------------------
-  // SEARCH
-  // -------------------------------------------------------
   const handleSearch = (text) => {
     setSearchQuery(text);
   };
 
-  // -------------------------------------------------------
-  // SORT
-  // -------------------------------------------------------
   const handleSort = () => {
     setSortOrder(sortOrder === "desc" ? "asc" : "desc");
   };
 
-  // -------------------------------------------------------
-  // EDITING
-  // -------------------------------------------------------
   const startEditing = (item) => {
     setEditingPrediction(item);
     setNewLabel(item.predicted_label);
@@ -233,9 +216,6 @@ export default function ManagePredictions() {
     fetchPredictions();
   }, []);
 
-  // -------------------------------------------------------
-  // LOADING SCREEN
-  // -------------------------------------------------------
   if (loading) {
     return (
       <View style={styles.center}>
@@ -245,9 +225,6 @@ export default function ManagePredictions() {
     );
   }
 
-  // -------------------------------------------------------
-  // UI RENDER
-  // -------------------------------------------------------
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}> Manage Predictions</Text>
@@ -277,7 +254,7 @@ export default function ManagePredictions() {
         </TouchableOpacity>
       </View>
 
-      {/* ⭐ FILTER BUTTONS */}
+      {/* FILTER BUTTONS */}
       <View style={styles.filterRow}>
         {["ALL", "VERIFIED", "UNVERIFIED"].map((type) => (
           <TouchableOpacity
@@ -525,7 +502,6 @@ const styles = StyleSheet.create({
   },
   sortText: { color: "#fff", fontSize: 13, fontWeight: "500", marginLeft: 5 },
 
-  // ⭐ FILTER BUTTON STYLES
   filterRow: {
     flexDirection: "row",
     justifyContent: "space-between",

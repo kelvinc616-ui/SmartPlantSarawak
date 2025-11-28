@@ -30,8 +30,7 @@ export default function AdminDashboard({ navigation }) {
           <Text style={styles.cardDesc}>View, edit or remove users.</Text>
         </View>
       </TouchableOpacity>
-
-            {/* IoT Card */}
+      
       <TouchableOpacity
         style={styles.card}
         onPress={() => navigation.navigate("IoTMonitoring")}

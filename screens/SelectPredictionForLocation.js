@@ -27,7 +27,7 @@ export default function SelectPredictionForLocation({ navigation }) {
           return;
         }
 
-        // 🔍 Fetch user's predictions that have no location or unverified location
+        // Fetch user's predictions that have no location or unverified location
         const q = query(
           collection(db, "predictions"),
           where("userId", "==", user.uid),
@@ -90,7 +90,7 @@ export default function SelectPredictionForLocation({ navigation }) {
 
   return (
     <View style={styles.container}>
-      {/* 🔹 Header */}
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color="#15931b" />
@@ -99,7 +99,7 @@ export default function SelectPredictionForLocation({ navigation }) {
         <View style={{ width: 30 }} /> {/* placeholder for spacing */}
       </View>
 
-      {/* 🔹 Content */}
+      {/* Content */}
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#15931b" />
@@ -124,7 +124,7 @@ export default function SelectPredictionForLocation({ navigation }) {
   );
 }
 
-// 💅 Styles
+// Styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,

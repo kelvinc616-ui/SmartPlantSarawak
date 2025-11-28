@@ -1,7 +1,7 @@
 module.exports = {
   preset: "react-native",
 
-  testEnvironment: "node",     // ✅ FIXED
+  testEnvironment: "node", 
 
   setupFiles: [
     "<rootDir>/jest.winter-disable.js",

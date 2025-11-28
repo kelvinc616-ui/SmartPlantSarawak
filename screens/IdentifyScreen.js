@@ -29,7 +29,7 @@ const onRefresh = () => {
   setRefreshing(false);
 };
 
-  // 📸 Capture from camera
+  //  Capture from camera
   const handleTakePhoto = async () => {
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -54,7 +54,7 @@ const onRefresh = () => {
     }
   };
 
-  // 🖼 Upload from gallery
+  //  Upload from gallery
   const handleUploadImage = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -79,7 +79,7 @@ const onRefresh = () => {
     }
   };
 
-  // 🌿 Identify Button → Upload → Predict → Offer next action
+  // Identify Button → Upload → Predict → Offer next action
   const handleIdentify = async () => {
     if (!selectedImage) {
       Alert.alert("No Image Selected", "Please upload or capture a photo first.");
@@ -128,7 +128,7 @@ const onRefresh = () => {
       const prediction = await aiResponse.json();
       setResult(prediction);
 
-      // 🎯 Ask user what to do next: Add Location / Publish / Cancel
+      // Ask user what to do next: Add Location / Publish / Cancel
       Alert.alert(
         "AI Prediction",
         `${prediction.predicted_label} (${prediction.confidence}%)`,
@@ -288,7 +288,7 @@ navigation.navigate("AddLocation", {
   );
 }
 
-// 🎨 Styles
+// Styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,

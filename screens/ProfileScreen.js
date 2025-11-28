@@ -110,7 +110,7 @@ export default function ProfileScreen({ navigation }) {
           <Text style={styles.editText}>Edit Profile</Text>
         </TouchableOpacity>
 
-        {/* ✅ My Observations Button */}
+        {/* My Observations Button */}
         <TouchableOpacity
           style={[styles.button, styles.observationButton]}
           onPress={() => navigation.navigate("MyObservations")}

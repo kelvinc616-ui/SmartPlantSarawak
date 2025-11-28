@@ -32,10 +32,7 @@ export default function HomeScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  /* ------------------------------
-     FETCH MOST RECENT OBSERVATIONS
-     Only verified items, sorted by time
-  ------------------------------ */
+//Fetch most recent observations. Only verified items, sorted by time
   async function fetchRecentPredictions() {
     const q = query(
       collection(db, "predictions"),
@@ -48,10 +45,7 @@ export default function HomeScreen({ navigation }) {
     setRecentPredictions(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
   }
 
-  /* ------------------------------
-     FETCH EXPLORE FEED
-     Includes user info + avatar
-  ------------------------------ */
+  //fetch Explore feed
   async function fetchExplorePlants() {
     const q = query(
       collection(db, "predictions"),
@@ -81,9 +75,7 @@ export default function HomeScreen({ navigation }) {
     setExplorePlants(list);
   }
 
-  /* ------------------------------
-     INITIAL LOAD
-  ------------------------------ */
+//initial load
   useEffect(() => {
     async function load() {
       try {
@@ -98,9 +90,7 @@ export default function HomeScreen({ navigation }) {
     load();
   }, []);
 
-  /* ------------------------------
-     PULL TO REFRESH
-  ------------------------------ */
+//pull to refresh
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await fetchRecentPredictions();
@@ -108,9 +98,6 @@ export default function HomeScreen({ navigation }) {
     setRefreshing(false);
   }, []);
 
-  /* ------------------------------
-     LOADING SPINNER
-  ------------------------------ */
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -291,9 +278,7 @@ export default function HomeScreen({ navigation }) {
   );
 }
 
-/* ------------------------------
-   STYLES
------------------------------- */
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f6f8f6" },
   loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
@@ -358,10 +343,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 30,
     borderWidth: 1.5,
-    borderColor: "#ff4d4d", // red
+    borderColor: "#ff4d4d", 
     alignItems: "center",
     marginLeft: 10,
-    backgroundColor: "#ffe5e5", // light red
+    backgroundColor: "#ffe5e5", 
   },
-  cardButtonPrimaryText: { fontSize: 15, color: "#ff1a1a", fontWeight: "700" }, // red text
+  cardButtonPrimaryText: { fontSize: 15, color: "#ff1a1a", fontWeight: "700" }, 
 });

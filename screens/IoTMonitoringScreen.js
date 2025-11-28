@@ -243,7 +243,7 @@ export default function IoT() {
       <View
         style={[
           styles.statusCard,
-          (sensorData.temperatureC < 10 || sensorData.temperatureC > 35 ||
+          (sensorData.temperatureC < 10 || sensorData.temperatureC > 45 ||
            sensorData.humidity < 5 || sensorData.humidity > 100 ||
            sensorData.soilMoisture < 0 || sensorData.soilMoisture > 90)
             ? styles.statusCardAlert
@@ -251,7 +251,7 @@ export default function IoT() {
         ]}
       >
         <Text style={styles.statusText}>
-          {(sensorData.temperatureC < 10 || sensorData.temperatureC > 35)
+          {(sensorData.temperatureC < 10 || sensorData.temperatureC > 45)
            ? "⚠️ Temperature out of range!"
            : (sensorData.humidity < 5 || sensorData.humidity > 100)
            ? "⚠️ Humidity out of range!"

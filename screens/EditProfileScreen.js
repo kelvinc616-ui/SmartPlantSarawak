@@ -15,9 +15,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { auth, db } from "../firebaseConfig";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { updatePassword } from "firebase/auth";
-import { storage } from "../firebaseConfig";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-
 
 export default function EditProfileScreen({ navigation }) {
   const user = auth.currentUser;
@@ -147,7 +144,7 @@ export default function EditProfileScreen({ navigation }) {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      {/* Profile Picture */}
+
       <TouchableOpacity style={styles.avatarContainer} onPress={pickImage}>
         {selectedImage ? (
           <Image source={{ uri: selectedImage }} style={styles.avatar} />
@@ -159,7 +156,6 @@ export default function EditProfileScreen({ navigation }) {
         <Text style={styles.changePhotoText}>Change Profile Photo</Text>
       </TouchableOpacity>
 
-      {/* Username */}
       <View style={styles.inputContainer}>
         <Text style={styles.label}>Username</Text>
         <TextInput
@@ -170,7 +166,6 @@ export default function EditProfileScreen({ navigation }) {
         />
       </View>
 
-      {/* Email (readonly) */}
       <View style={styles.inputContainer}>
         <Text style={styles.label}>Email</Text>
         <TextInput
@@ -180,7 +175,6 @@ export default function EditProfileScreen({ navigation }) {
         />
       </View>
 
-      {/* Password */}
       <View style={styles.inputContainer}>
         <Text style={styles.label}>New Password</Text>
         <TextInput
@@ -203,7 +197,6 @@ export default function EditProfileScreen({ navigation }) {
         />
       </View>
 
-      {/* Save Button */}
       <TouchableOpacity
         style={[styles.saveButton, saving && { backgroundColor: "#9ecfa2" }]}
         onPress={handleSave}
